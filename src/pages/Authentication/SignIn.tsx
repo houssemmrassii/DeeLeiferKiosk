@@ -23,14 +23,20 @@ const SignIn: React.FC<SignInProps> = ({ setCurrentUser }) => {
     setError('');
     setLoading(true); // Start loading
 
-    console.log('Attempting to sign in with email:', email);
+    console.log('Attempting to sign in...');
+    console.log('Email:', email);
+    console.log('Password:', password);
 
     try {
+      console.log('Connecting to Firestore...');
       const usersRef = collection(db, 'users');
-      const q = query(usersRef, where('email', '==', email));
-      const querySnapshot = await getDocs(q);
+      console.log('Users collection reference created:', usersRef);
 
-      console.log('Query Snapshot:', querySnapshot);
+      const q = query(usersRef, where('email', '==', email));
+      console.log('Query created:', q);
+
+      const querySnapshot = await getDocs(q);
+      console.log('Query executed, snapshot received:', querySnapshot);
 
       if (querySnapshot.empty) {
         console.log('No user found with the provided email.');
@@ -71,6 +77,12 @@ const SignIn: React.FC<SignInProps> = ({ setCurrentUser }) => {
     } catch (error: any) {
       console.error('Error during sign in:', error);
       setError('An error occurred during sign-in. Please try again.');
+      if (error.code) {
+        console.log('Firebase error code:', error.code);
+      }
+      if (error.message) {
+        console.log('Firebase error message:', error.message);
+      }
     } finally {
       setLoading(false); // Stop loading
     }

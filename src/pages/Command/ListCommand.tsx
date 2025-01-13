@@ -3,10 +3,10 @@ import { db } from "../../FirebaseConfig";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { FaEye } from "react-icons/fa";
 import { useNavigate } from "react-router-dom";
-
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Pagination from "@mui/material/Pagination";
+import PaginationItem from "@mui/material/PaginationItem";
 
 interface Commande {
   id: string;
@@ -26,10 +26,11 @@ interface User {
 
 const CommandTable: React.FC = () => {
   const [commandes, setCommandes] = useState<Commande[]>([]);
+  const [filteredCommandes, setFilteredCommandes] = useState<Commande[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<string>(""); // Empty means no filter
   const commandsPerPage = 5;
   const navigate = useNavigate();
-
 
   const fetchCommandes = async () => {
     try {
@@ -42,7 +43,6 @@ const CommandTable: React.FC = () => {
           let userName = "Unknown User";
           let userAddress = "Unknown Address";
 
-          // Fetch User Details with Role 'Client'
           if (userRef) {
             const userDoc = await getDoc(userRef);
             if (userDoc.exists()) {
@@ -56,7 +56,6 @@ const CommandTable: React.FC = () => {
             }
           }
 
-          // Determine Status
           let status = "Pending";
           const now = new Date();
           if (data.DateShippingStart?.seconds) {
@@ -81,6 +80,7 @@ const CommandTable: React.FC = () => {
         })
       );
       setCommandes(commandsData);
+      setFilteredCommandes(commandsData); // Initialize with all commandes
     } catch (error) {
       console.error("Error fetching commandes:", error);
       toast.error("Failed to fetch commandes.");
@@ -91,15 +91,36 @@ const CommandTable: React.FC = () => {
     fetchCommandes();
   }, []);
 
-  // Handle Pagination
+  useEffect(() => {
+    // Filter commands based on selected status
+    if (statusFilter) {
+      const filtered = commandes.filter((command) => command.status === statusFilter);
+      setFilteredCommandes(filtered);
+    } else {
+      setFilteredCommandes(commandes); // Show all commands if no filter
+    }
+  }, [statusFilter, commandes]);
+
   const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
     setCurrentPage(value);
   };
 
-  // Pagination Logic
+  const handleStatusChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
+    setStatusFilter(event.target.value);
+  };
+
   const indexOfLastCommand = currentPage * commandsPerPage;
   const indexOfFirstCommand = indexOfLastCommand - commandsPerPage;
-  const currentCommands = commandes.slice(indexOfFirstCommand, indexOfLastCommand);
+  const currentCommands = filteredCommandes.slice(indexOfFirstCommand, indexOfLastCommand);
+
+  const totalPages = Math.ceil(filteredCommandes.length / commandsPerPage);
+
+  // Sort commands by creation date (most recent first)
+  const sortedCommands = currentCommands.sort((a, b) => {
+    const dateA = new Date(a.dateCreation).getTime();
+    const dateB = new Date(b.dateCreation).getTime();
+    return dateB - dateA; // Sort in descending order
+  });
 
   return (
     <div className="p-6 bg-white rounded-lg shadow-lg dark:bg-gray-800">
@@ -108,6 +129,24 @@ const CommandTable: React.FC = () => {
         <h1 className="text-xl font-semibold text-gray-800 dark:text-white">
           Commande List
         </h1>
+
+        {/* Status Filter */}
+        <div>
+          <label htmlFor="statusFilter" className="mr-2 text-gray-800 dark:text-white">
+            Filter by Status:
+          </label>
+          <select
+            id="statusFilter"
+            value={statusFilter}
+            onChange={handleStatusChange}
+            className="p-2 border rounded"
+          >
+            <option value="">All</option>
+            <option value="Pending">Pending</option>
+            <option value="Delivering">Delivering</option>
+            <option value="Delivered">Delivered</option>
+          </select>
+        </div>
       </div>
 
       {/* Table */}
@@ -136,7 +175,7 @@ const CommandTable: React.FC = () => {
             </tr>
           </thead>
           <tbody>
-            {currentCommands.map((command) => (
+            {sortedCommands.map((command) => (
               <tr
                 key={command.id}
                 className="border-t hover:bg-gray-100 dark:hover:bg-gray-700"
@@ -167,7 +206,7 @@ const CommandTable: React.FC = () => {
                   €{command.totalAmount.toFixed(2)}
                 </td>
                 <td className="px-4 py-3">
-                <button
+                  <button
                     onClick={() => navigate(`/CommandDetail/${command.id}`)} // Navigate to details page
                     className="text-blue-500 hover:text-blue-700 transition"
                     title="View Details"
@@ -184,10 +223,34 @@ const CommandTable: React.FC = () => {
       {/* Pagination */}
       <div className="flex justify-center mt-6">
         <Pagination
-          count={Math.ceil(commandes.length / commandsPerPage)}
+          count={totalPages}
           page={currentPage}
           onChange={handlePageChange}
           color="primary"
+          renderItem={(item) => {
+            // Check if item is a number
+            if (typeof item.page === "number") {
+              return <PaginationItem {...item} />;
+            }
+
+            // Custom handling for ellipsis (only render as a non-page element)
+            if (item.page === "...") {
+              return (
+                <span
+                  style={{
+                    color: "gray",
+                    fontWeight: "bold",
+                    padding: "0 8px",
+                    cursor: "pointer",
+                  }}
+                >
+                  ...
+                </span>
+              );
+            }
+
+            return null;
+          }}
         />
       </div>
     </div>

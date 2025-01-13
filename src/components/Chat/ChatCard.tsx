@@ -1,107 +1,149 @@
-import { Link } from 'react-router-dom';
-import { Chat } from '../../types/chat';
-import UserOne from '../../images/user/user-01.png';
-import UserTwo from '../../images/user/user-02.png';
-import UserThree from '../../images/user/user-03.png';
-import UserFour from '../../images/user/user-04.png';
-import UserFive from '../../images/user/user-05.png';
+import { useEffect, useState } from 'react';
+import { getDocs, collection, getDoc } from 'firebase/firestore';
+import { db } from '../../FirebaseConfig'; // Adjust to your firebase config
 
-const chatData: Chat[] = [
-  {
-    avatar: UserOne,
-    name: 'Devid Heilo',
-    text: 'How are you?',
-    time: 12,
-    textCount: 3,
-    color: '#10B981',
-  },
-  {
-    avatar: UserTwo,
-    name: 'Henry Fisher',
-    text: 'Waiting for you!',
-    time: 12,
-    textCount: 0,
-    color: '#DC3545',
-  },
-  {
-    avatar: UserFour,
-    name: 'Jhon Doe',
-    text: "What's up?",
-    time: 32,
-    textCount: 0,
-    color: '#10B981',
-  },
-  {
-    avatar: UserFive,
-    name: 'Jane Doe',
-    text: 'Great',
-    time: 32,
-    textCount: 2,
-    color: '#FFBA00',
-  },
-  {
-    avatar: UserOne,
-    name: 'Jhon Doe',
-    text: 'How are you?',
-    time: 32,
-    textCount: 0,
-    color: '#10B981',
-  },
-  {
-    avatar: UserThree,
-    name: 'Jhon Doe',
-    text: 'How are you?',
-    time: 32,
-    textCount: 3,
-    color: '#FFBA00',
-  },
-];
+interface User {
+  userName: string;
+  phoneNumber: string;
+  email: string;
+}
 
 const ChatCard = () => {
+  const [helpMessages, setHelpMessages] = useState<any[]>([]); // Store the fetched help messages
+  const [currentPage, setCurrentPage] = useState(1); // Current page
+  const [messagesPerPage] = useState(5); // Number of messages per page
+  const [totalPages, setTotalPages] = useState(1); // Total number of pages
+
+  // Fetch HelpMessages from Firestore
+  const fetchHelpMessages = async () => {
+    try {
+      const querySnapshot = await getDocs(collection(db, 'Helpmessage'));
+
+      if (querySnapshot.empty) {
+        console.log('No help messages found.');
+        return;
+      }
+
+      const messagesData: any[] = [];
+
+      // Loop through Firestore documents and fetch user data
+      for (const docSnapshot of querySnapshot.docs) {
+        const data = docSnapshot.data();
+
+        const userRef = data.user;
+        const userSnapshot = await getDoc(userRef);
+
+        if (userSnapshot.exists()) {
+          const userData = userSnapshot.data() as User;
+          messagesData.push({
+            phoneNumber: data.PhoneNumber,
+            email: data.email,
+            userName: userData.userName,  // Directly using userName from the user data
+            message: data.message,
+          });
+        } else {
+          console.log('No user data found for message:', docSnapshot.id);
+        }
+      }
+
+      setHelpMessages(messagesData); // Update the state with the fetched messages
+      setTotalPages(Math.ceil(messagesData.length / messagesPerPage)); // Set total pages
+    } catch (error) {
+      console.error('Error fetching HelpMessages:', error);
+    }
+  };
+
+  // Fetch help messages when component mounts
+  useEffect(() => {
+    fetchHelpMessages();
+  }, []);
+
+  // Logic for displaying messages for the current page
+  const indexOfLastMessage = currentPage * messagesPerPage;
+  const indexOfFirstMessage = indexOfLastMessage - messagesPerPage;
+  const currentMessages = helpMessages.slice(indexOfFirstMessage, indexOfLastMessage);
+
+  // Change page
+  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
+
+  // Previous page
+  const previousPage = () => {
+    if (currentPage > 1) {
+      setCurrentPage(currentPage - 1);
+    }
+  };
+
+  // Next page
+  const nextPage = () => {
+    if (currentPage < totalPages) {
+      setCurrentPage(currentPage + 1);
+    }
+  };
+
   return (
     <div className="col-span-12 rounded-sm border border-stroke bg-white py-6 shadow-default dark:border-strokedark dark:bg-boxdark xl:col-span-4">
-      <h4 className="mb-6 px-7.5 text-xl font-semibold text-black dark:text-white">
-        Chats
-      </h4>
-
+      <h4 className="mb-6 px-7.5 text-xl font-semibold text-black dark:text-white">Help Messages</h4>
+      
       <div>
-        {chatData.map((chat, key) => (
-          <Link
-            to="/"
-            className="flex items-center gap-5 py-3 px-7.5 hover:bg-gray-3 dark:hover:bg-meta-4"
-            key={key}
-          >
-            <div className="relative h-14 w-14 rounded-full">
-              <img src={chat.avatar} alt="User" />
-              <span
-                className="absolute right-0 bottom-0 h-3.5 w-3.5 rounded-full border-2 border-white"
-                style={{backgroundColor: chat.color}}
-              ></span>
-            </div>
-
-            <div className="flex flex-1 items-center justify-between">
-              <div>
-                <h5 className="font-medium text-black dark:text-white">
-                  {chat.name}
-                </h5>
-                <p>
-                  <span className="text-sm text-black dark:text-white">
-                    {chat.text}
-                  </span>
-                  <span className="text-xs"> . {chat.time} min</span>
-                </p>
-              </div>
-              {chat.textCount !== 0 && (
-                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary">
-                  <span className="text-sm font-medium text-white">
-                    {' '}
-                    {chat.textCount}
-                  </span>
+        {currentMessages.length === 0 ? (
+          <p>No messages available.</p>
+        ) : (
+          currentMessages.map((message, key) => (
+            <div key={key} className="flex items-center gap-5 py-3 px-7.5 hover:bg-gray-3 dark:hover:bg-meta-4">
+              <div className="flex flex-1 items-center justify-between">
+                <div>
+                  <h5 className="font-medium text-black dark:text-white">
+                    {message.userName} {/* Directly displaying userName */}
+                  </h5>
+                  <p className="text-sm text-black dark:text-white">
+                    <strong>Email:</strong> {message.email || 'N/A'}
+                  </p>
+                  <p className="text-sm text-black dark:text-white">
+                    <strong>Phone:</strong> {message.phoneNumber || 'N/A'}
+                  </p>
+                  <p>
+                    <span className="text-sm text-black dark:text-white">
+                      <strong>Message:</strong> {message.message || 'No message'}
+                    </span>
+                  </p>
                 </div>
-              )}
+              </div>
             </div>
-          </Link>
-        ))}
+          ))
+        )}
+      </div>
+
+      {/* Pagination controls */}
+      <div className="flex justify-between items-center mt-6">
+        <button 
+          onClick={() => paginate(1)} 
+          disabled={currentPage === 1} 
+          className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">
+          First
+        </button>
+
+        <button 
+          onClick={previousPage} 
+          disabled={currentPage === 1} 
+          className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">
+          Previous
+        </button>
+
+        <span className="px-3 py-2 text-black dark:text-white">Page {currentPage} of {totalPages}</span>
+
+        <button 
+          onClick={nextPage} 
+          disabled={currentPage === totalPages} 
+          className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">
+          Next
+        </button>
+
+        <button 
+          onClick={() => paginate(totalPages)} 
+          disabled={currentPage === totalPages} 
+          className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">
+          Last
+        </button>
       </div>
     </div>
   );
