@@ -7,6 +7,8 @@ import Breadcrumb from "../../components/Breadcrumbs/Breadcrumb";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
+import { TrashIcon } from '@heroicons/react/24/outline';
+
 
 
 interface Category {
@@ -34,7 +36,7 @@ const AddProduct: React.FC = () => {
     offrePercentage: 0,
     allergies: "",
     conservationStorage: "",
-    ingredients: "",
+    ingredients: [] as { name: string; quantity: string; calories: number }[], // New
     images: [] as File[],
     category: null as Category | null,
     types: [] as { value: string; label: string }[],
@@ -139,6 +141,33 @@ const AddProduct: React.FC = () => {
       setFormData({ ...formData, images: Array.from(e.target.files) });
     }
   };
+  const handleAddIngredient = () => {
+    setFormData((prevState) => ({
+      ...prevState,
+      ingredients: [...prevState.ingredients, { name: "", quantity: "", calories: 0 }],
+    }));
+  };
+  
+  const handleRemoveIngredient = (index: number) => {
+    setFormData((prevState) => ({
+      ...prevState,
+      ingredients: prevState.ingredients.filter((_, i) => i !== index),
+    }));
+  };
+  
+  const handleIngredientChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    index: number,
+    field: "name" | "quantity" | "calories"
+  ) => {
+    const value = field === "calories" ? parseFloat(e.target.value) || 0 : e.target.value;
+    setFormData((prevState) => {
+      const updatedIngredients = [...prevState.ingredients];
+      updatedIngredients[index] = { ...updatedIngredients[index], [field]: value };
+      return { ...prevState, ingredients: updatedIngredients };
+    });
+  };
+  
 
   const handleSubmit = async (e: React.FormEvent) => {
     
@@ -177,7 +206,7 @@ const AddProduct: React.FC = () => {
         offrePercentage: formData.offrePercentage,
         allergies: formData.allergies.trim() || "--", // Default to "--" if empty
         conservationStorage: formData.conservationStorage.trim() || "--", // Default to "--"
-        ingredients: formData.ingredients.trim() || "--", // Default to "--"
+        ingredients: formData.ingredients, // Save as array of objects
         images: imageUrls,
         category: categoryRef, // Firestore reference
         types: typeRefs, // Array of Firestore references
@@ -196,7 +225,7 @@ const AddProduct: React.FC = () => {
         offrePercentage: 0,
         allergies: "--",
         conservationStorage: "--",
-        ingredients: "",
+        ingredients: formData.ingredients, // Save as array of objects
         images: [],
         category: null,
         types: [],
@@ -288,22 +317,19 @@ const AddProduct: React.FC = () => {
   
           {/* Types */}
           {formData.category && (
-            <div>
-              <label className="block text-sm font-semibold text-[#0a100d] dark:text-[#d6d5c9] mb-2">
-                Types
-              </label>
-              <Select
-                options={formData.category.types}
-                isMulti
-                onChange={handleTypeChange}
-                value={formData.types}
-                placeholder="Select types"
-                className="text-gray-800 dark:text-white"
-              />
-
-                {/* Add type options dynamically here */}
-             
-            </div>
+  <div>
+    <label className="block text-sm font-semibold text-[#0a100d] dark:text-[#d6d5c9] mb-2">
+      Types
+    </label>
+    <Select
+      options={formData.category.types} // Dynamically loaded from selected category
+      isMulti={false} // Set to true if multiple types are allowed
+      onChange={handleTypeChange} // Updates formData.types
+      value={formData.types}
+      placeholder="Select a type"
+      className="text-gray-800 dark:text-white"
+    />
+  </div>
           )}
         </div>
   
@@ -397,19 +423,57 @@ const AddProduct: React.FC = () => {
               />
             </div>
   
-            <div>
-              <label className="block text-sm font-semibold text-[#0a100d] dark:text-[#d6d5c9] mb-2">
-                Ingredients
-              </label>
-              <textarea
-                name="ingredients"
-                value={formData.ingredients}
-                onChange={handleInputChange}
-                rows={3}
-                className="w-full rounded-lg border border-[#b9baa3] bg-transparent py-3 px-5 text-[#0a100d] dark:text-[#d6d5c9]"
-                placeholder="Enter ingredients"
-              />
-            </div>
+            <div className="mb-6">
+  <h3 className="text-lg font-semibold text-[#0a100d] dark:text-[#d6d5c9] mb-4">
+    Ingredients
+  </h3>
+  {formData.ingredients.map((ingredient, index) => (
+    <div
+      key={index}
+      className="flex items-center gap-4 mb-4 bg-gray-100 p-4 rounded-lg shadow-md dark:bg-gray-800"
+    >
+      <input
+        type="text"
+        placeholder="Ingredient Name"
+        value={ingredient.name}
+        onChange={(e) => handleIngredientChange(e, index, "name")}
+        className="flex-1 rounded-lg border border-gray-300 py-2 px-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+      />
+      <input
+        type="text"
+        placeholder="Quantity (e.g., 150 ml)"
+        value={ingredient.quantity}
+        onChange={(e) => handleIngredientChange(e, index, "quantity")}
+        className="flex-1 rounded-lg border border-gray-300 py-2 px-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+      />
+      <input
+        type="number"
+        placeholder="Calories"
+        value={ingredient.calories}
+        onChange={(e) => handleIngredientChange(e, index, "calories")}
+        className="flex-1 rounded-lg border border-gray-300 py-2 px-4 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+      />
+      <button
+        type="button"
+        onClick={() => handleRemoveIngredient(index)}
+        className="text-red-500 hover:text-red-700 dark:hover:text-red-400"
+      >
+        <TrashIcon className="h-6 w-6" />
+      </button>
+    </div>
+  ))}
+  <div className="flex justify-center">
+    <button
+      type="button"
+      onClick={handleAddIngredient}
+      className="bg-green-500 text-white px-6 py-3 rounded-full hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-green-400"
+    >
+      + Add Ingredient
+    </button>
+  </div>
+</div>
+
+
           </div>
         )}
   

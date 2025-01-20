@@ -45,11 +45,24 @@ const ListDeliveryman = () => {
     fetchDeliverymen();
   }, []);
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async () => {
+    if (!deleteId) return;
+
     try {
-      await deleteDoc(doc(db, "users", id));
-      setDeliverymen(deliverymen.filter((man) => man.uid !== id));
+      // Start deletion process
+      await deleteDoc(doc(db, "users", deleteId));  // This deletes the document from Firestore
+
+      // Filter out the deleted deliveryman from the state
+      setDeliverymen((prevDeliverymen) =>
+        prevDeliverymen.filter((man) => man.uid !== deleteId)
+      );
+
+      // Show success message
       toast.success("Delivery man deleted successfully!");
+
+      // Reset deletion state
+      setIsDeleting(false);
+      setDeleteId(null);
     } catch (error) {
       console.error("Error deleting delivery man:", error);
       toast.error("Failed to delete delivery man. Please try again.");
@@ -57,13 +70,13 @@ const ListDeliveryman = () => {
   };
 
   const confirmDelete = (id: string) => {
-    setDeleteId(id);
-    setIsDeleting(true);
+    setDeleteId(id);  // Set the ID of the deliveryman to delete
+    setIsDeleting(true);  // Trigger deletion modal or confirmation
   };
 
   const cancelDelete = () => {
-    setDeleteId(null);
-    setIsDeleting(false);
+    setDeleteId(null); // Reset the deletion process
+    setIsDeleting(false); // Close the confirmation modal
   };
 
   const handleEdit = (deliveryman: Deliveryman) => {
@@ -194,7 +207,7 @@ const ListDeliveryman = () => {
                       <FaEye />
                     </button>
                     <button
-                      onClick={() => navigate(`/EditDeliveryman/${man.uid}`)}
+                      onClick={() => handleEdit(man)}
                       className="text-gray-500 hover:text-[#a22c29] transition"
                       title="Edit"
                     >
@@ -214,6 +227,29 @@ const ListDeliveryman = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {isDeleting && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg">
+            <h2 className="text-xl font-semibold mb-4">Are you sure you want to delete this deliveryman?</h2>
+            <div className="flex justify-end gap-4">
+              <button
+                onClick={cancelDelete}
+                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-400"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500"
+              >
+                Confirm Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

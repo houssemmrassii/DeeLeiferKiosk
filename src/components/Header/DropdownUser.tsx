@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import ClickOutside from "../ClickOutside";
+import { UserCircleIcon, CogIcon, ArrowLeftOnRectangleIcon } from "@heroicons/react/24/outline"; // Heroicons
 import UserOne from "../../images/user/user-01.png";
 
 const DropdownUser: React.FC = () => {
@@ -80,16 +81,7 @@ const DropdownUser: React.FC = () => {
                 to="/profile"
                 className="flex items-center gap-3 text-sm font-medium text-gray-700 hover:text-primary dark:text-gray-300"
               >
-                <svg
-                  className="w-5 h-5"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path
-                    d="M12 12c2.761 0 5-2.239 5-5s-2.239-5-5-5-5 2.239-5 5 2.239 5 5 5zm0 2c-3.313 0-6 2.687-6 6v2h12v-2c0-3.313-2.687-6-6-6z"
-                  />
-                </svg>
+                <UserCircleIcon className="w-5 h-5" />
                 My Profile
               </Link>
             </li>
@@ -98,16 +90,7 @@ const DropdownUser: React.FC = () => {
                 to="/settings"
                 className="flex items-center gap-3 text-sm font-medium text-gray-700 hover:text-primary dark:text-gray-300"
               >
-                <svg
-                  className="w-5 h-5"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                >
-                  <path
-                    d="M12 6c-1.105 0-2 .895-2 2s.895 2 2 2 2-.895 2-2-.895-2-2-2zm8 4h-1.073c-.359-1.674-1.805-3-3.677-3.651.005-.111.012-.222.012-.349 0-1.104-.895-2-2-2s-2 .896-2 2c0 .126.006.238.012.349-1.873.651-3.319 1.977-3.678 3.651h-1.073c-1.104 0-2 .896-2 2s.896 2 2 2h1.073c.359 1.674 1.805 3 3.678 3.651-.006.111-.012.223-.012.349 0 1.104.895 2 2 2s2-.896 2-2c0-.126-.007-.238-.012-.349 1.872-.651 3.318-1.977 3.678-3.651h1.073c1.104 0 2-.896 2-2s-.896-2-2-2zm-8 6c-2.209 0-4-1.791-4-4s1.791-4 4-4 4 1.791 4 4-1.791 4-4 4z"
-                  />
-                </svg>
+                <CogIcon className="w-5 h-5" />
                 Account Settings
               </Link>
             </li>
@@ -117,16 +100,7 @@ const DropdownUser: React.FC = () => {
             onClick={handleLogout}
             className="flex items-center gap-3 px-6 py-4 text-sm font-medium text-red-600 hover:text-red-800"
           >
-            <svg
-              className="w-5 h-5"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 24 24"
-              fill="currentColor"
-            >
-              <path
-                d="M16 17v-2h-6v-6h6v-2l4 4-4 4zm-6-11v-2h10v2h-10zm0 18h10v2h-10v-2zm-9-10h5v2h-5v6h8v2h-10v-10z"
-              />
-            </svg>
+            <ArrowLeftOnRectangleIcon className="w-5 h-5" />
             Logout
           </button>
         </div>
