@@ -68,13 +68,21 @@ const ListProduct: React.FC = () => {
   const handleDeleteProduct = async (id: string) => {
     try {
       await deleteDoc(doc(db, "Product", id));
-      setProducts(products.filter((product) => product.id !== id));
+  
+      // Update both products and filteredProducts
+      const updatedProducts = products.filter((product) => product.id !== id);
+      setProducts(updatedProducts);
+  
+      const updatedFilteredProducts = filteredProducts.filter((product) => product.id !== id);
+      setFilteredProducts(updatedFilteredProducts);
+  
       toast.success("Product deleted successfully!");
     } catch (error) {
       console.error("Error deleting product:", error);
       toast.error("Failed to delete product.");
     }
   };
+  
 
   const toggleStockStatus = async (id: string, currentStatus: "In Stock" | "Out of Stock") => {
     const newStatus = currentStatus === "In Stock" ? "Out of Stock" : "In Stock";

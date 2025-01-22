@@ -2,14 +2,12 @@ import React, { useEffect, useState } from "react";
 import { db, storage } from "../../FirebaseConfig";
 import { collection, getDocs, doc, addDoc, getDoc } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import Select from "react-select"; // Import react-select
+import Select from "react-select";
 import Breadcrumb from "../../components/Breadcrumbs/Breadcrumb";
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { useNavigate } from "react-router-dom";
-import { TrashIcon } from '@heroicons/react/24/outline';
-
-
+import { TrashIcon } from "@heroicons/react/24/outline";
 
 interface Category {
   id: string;
@@ -36,66 +34,46 @@ const AddProduct: React.FC = () => {
     offrePercentage: 0,
     allergies: "",
     conservationStorage: "",
-    ingredients: [] as { name: string; quantity: string; calories: number }[], // New
+    ingredients: [] as { name: string; quantity: string; calories: number }[],
     images: [] as File[],
     category: null as Category | null,
-    types: [] as { value: string; label: string }[],
+    type: null as { value: string; label: string } | null,
   });
-  const [uploading, setUploading] = useState(false);
-  const [showMoreOptions, setShowMoreOptions] = useState(false); // Toggle for more options
 
-  // Fetch categories and types
+  const [uploading, setUploading] = useState(false);
+  const [showMoreOptions, setShowMoreOptions] = useState(false); // Add state for "More Options"
+
   useEffect(() => {
     const fetchCategoriesAndTypes = async () => {
       try {
         const categorySnapshot = await getDocs(collection(db, "category"));
-
         const categoriesData = await Promise.all(
           categorySnapshot.docs.map(async (categoryDoc) => {
             const categoryData = categoryDoc.data();
-            const typeRefs = categoryData.types || []; // 'types' field
-
-            // Resolve type references or paths to names
+            const typeRefs = categoryData.types || [];
             const resolvedTypes = await Promise.all(
               typeRefs.map(async (typeRef: any) => {
-                let typeId: string | undefined;
-
-                if (typeof typeRef === "string") {
-                  // Handle string paths
-                  typeId = typeRef.split("/").pop(); // Extract ID from string path
-                } else if (typeRef?.path) {
-                  // Handle Firestore references
-                  typeId = typeRef.path.split("/").pop();
-                } else {
-                  console.warn("Unknown type format:", typeRef);
-                  return { value: "", label: "Unknown Type" };
-                }
-
-                // Fetch type document by ID
+                const typeId =
+                  typeof typeRef === "string"
+                    ? typeRef.split("/").pop()
+                    : typeRef?.path?.split("/").pop();
                 if (typeId) {
-                  try {
-                    const typeDoc = await getDoc(doc(db, "type", typeId));
-                    if (typeDoc.exists()) {
-                      const typeData = typeDoc.data() as Type;
-                      return { value: typeId, label: typeData.name || "Unnamed Type" };
-                    }
-                  } catch (error) {
-                    console.error("Error fetching type document:", error);
+                  const typeDoc = await getDoc(doc(db, "type", typeId));
+                  if (typeDoc.exists()) {
+                    const typeData = typeDoc.data() as Type;
+                    return { value: typeId, label: typeData.name || "Unnamed Type" };
                   }
                 }
-
                 return { value: "", label: "Unknown Type" };
               })
             );
-
             return {
               id: categoryDoc.id,
               name: categoryData.name || "Unnamed Category",
-              types: resolvedTypes.filter((type) => type.value), // Filter valid types
+              types: resolvedTypes.filter((type) => type.value),
             };
           })
         );
-
         setCategories(categoriesData as Category[]);
       } catch (error) {
         console.error("Error fetching categories or types:", error);
@@ -110,30 +88,23 @@ const AddProduct: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value, type } = e.target;
-    let parsedValue;
-
-    if (type === "checkbox") {
-      parsedValue = (e.target as HTMLInputElement).checked;
-    } else if (name === "price") {
-      parsedValue = parseFloat(value) || 0; // Parse as float
-    } else {
-      parsedValue = value;
-    }
+    const parsedValue =
+      type === "checkbox"
+        ? (e.target as HTMLInputElement).checked
+        : name === "price"
+        ? parseFloat(value) || 0
+        : value;
 
     setFormData({ ...formData, [name]: parsedValue });
   };
 
   const handleCategoryChange = (selectedCategory: any) => {
     const category = categories.find((cat) => cat.id === selectedCategory?.value) || null;
-    setFormData({
-      ...formData,
-      category,
-      types: category ? category.types : [],
-    });
+    setFormData({ ...formData, category, type: null }); // Reset type when category changes
   };
 
-  const handleTypeChange = (selectedTypes: any) => {
-    setFormData({ ...formData, types: selectedTypes || [] });
+  const handleTypeChange = (selectedType: any) => {
+    setFormData({ ...formData, type: selectedType || null }); // Save single type
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -141,39 +112,39 @@ const AddProduct: React.FC = () => {
       setFormData({ ...formData, images: Array.from(e.target.files) });
     }
   };
+
   const handleAddIngredient = () => {
     setFormData((prevState) => ({
       ...prevState,
       ingredients: [...prevState.ingredients, { name: "", quantity: "", calories: 0 }],
     }));
   };
-  
+
   const handleRemoveIngredient = (index: number) => {
     setFormData((prevState) => ({
       ...prevState,
       ingredients: prevState.ingredients.filter((_, i) => i !== index),
     }));
   };
-  
   const handleIngredientChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     index: number,
     field: "name" | "quantity" | "calories"
   ) => {
-    const value = field === "calories" ? parseFloat(e.target.value) || 0 : e.target.value;
-    setFormData((prevState) => {
-      const updatedIngredients = [...prevState.ingredients];
-      updatedIngredients[index] = { ...updatedIngredients[index], [field]: value };
-      return { ...prevState, ingredients: updatedIngredients };
-    });
+    const { value } = e.target;
+    setFormData((prevState) => ({
+      ...prevState,
+      ingredients: prevState.ingredients.map((ingredient, i) =>
+        i === index ? { ...ingredient, [field]: field === "calories" ? parseFloat(value) || 0 : value } : ingredient
+      ),
+    }));
   };
   
 
   const handleSubmit = async (e: React.FormEvent) => {
-    
     e.preventDefault();
   
-    if (!formData.name || formData.price <= 0 || !formData.category) {
+    if (!formData.name || formData.price <= 0 || !formData.category || !formData.type) {
       toast.error("Please fill out all required fields.");
       return;
     }
@@ -181,7 +152,6 @@ const AddProduct: React.FC = () => {
     try {
       setUploading(true);
   
-      // Upload images to Firebase Storage and get their URLs
       const imageUrls = await Promise.all(
         formData.images.map(async (file) => {
           const storageRef = ref(storage, `product_images/${file.name}`);
@@ -190,28 +160,19 @@ const AddProduct: React.FC = () => {
         })
       );
   
-      // Create Firestore references for category and types
       const categoryRef = doc(db, "category", formData.category.id);
-      const typeRefs = formData.types.map((type) => doc(db, "type", type.value));
-
   
-      // Add product to Firestore
       await addDoc(collection(db, "Product"), {
-        name: formData.name,
-        description: formData.description,
-        price: parseFloat(formData.price.toString()), // Store as float
-        origin: formData.origin.trim() || "--", // Default to "--" if empty
-        isSpecial: formData.isSpecial,
-        isOffre: formData.isOffre,
-        offrePercentage: formData.offrePercentage,
-        allergies: formData.allergies.trim() || "--", // Default to "--" if empty
-        conservationStorage: formData.conservationStorage.trim() || "--", // Default to "--"
-        ingredients: formData.ingredients, // Save as array of objects
+        ...formData,
+        price: parseFloat(formData.price.toString()),
+        origin: formData.origin || "--",
+        allergies: formData.allergies || "--",
+        conservationStorage: formData.conservationStorage || "--",
         images: imageUrls,
-        category: categoryRef, // Firestore reference
-        types: typeRefs, // Array of Firestore references
+        category: categoryRef,
+        type: formData.type, // Save single type
         creationDate: new Date(),
-        status: "In Stock", // Default status
+        status: "In Stock",
       });
   
       toast.success("Product added successfully!");
@@ -223,15 +184,14 @@ const AddProduct: React.FC = () => {
         isSpecial: false,
         isOffre: false,
         offrePercentage: 0,
-        allergies: "--",
-        conservationStorage: "--",
-        ingredients: formData.ingredients, // Save as array of objects
+        allergies: "",
+        conservationStorage: "",
+        ingredients: [],
         images: [],
         category: null,
-        types: [],
+        type: null,
       });
       navigate("/ListProduct");
-
     } catch (error) {
       console.error("Error adding product:", error);
       toast.error("Failed to add product.");
@@ -239,7 +199,7 @@ const AddProduct: React.FC = () => {
       setUploading(false);
     }
   };
-  
+
   return (
     <div className="p-6 bg-white rounded-lg shadow-lg dark:bg-[#0a100d]">
       <Breadcrumb pageName="Add Product" />
@@ -322,13 +282,13 @@ const AddProduct: React.FC = () => {
       Types
     </label>
     <Select
-      options={formData.category.types} // Dynamically loaded from selected category
-      isMulti={false} // Set to true if multiple types are allowed
-      onChange={handleTypeChange} // Updates formData.types
-      value={formData.types}
-      placeholder="Select a type"
-      className="text-gray-800 dark:text-white"
-    />
+  options={formData.category?.types || []} // Dynamically loaded from selected category
+  onChange={handleTypeChange} // Updates formData.type
+  value={formData.type}
+  placeholder="Select a type"
+  className="text-gray-800 dark:text-white"
+/>
+
   </div>
           )}
         </div>
