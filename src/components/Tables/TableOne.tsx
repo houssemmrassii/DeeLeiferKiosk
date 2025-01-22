@@ -22,58 +22,77 @@ const TableOne = () => {
   const fetchRecentOrders = async () => {
     try {
       console.log("Fetching recent orders...");
-
+  
       const ordersQuery = query(collection(db, 'Commande'), orderBy('DatePAssCommande', 'desc'), limit(5));
       const querySnapshot = await getDocs(ordersQuery);
-      console.log("Query snapshot fetched:", querySnapshot.docs.length, "documents found.");
-
+      console.log("Number of orders fetched:", querySnapshot.size);
+  
       const ordersData: any[] = [];
-
-      // Loop through orders and resolve references
+  
       for (const docSnapshot of querySnapshot.docs) {
         const data = docSnapshot.data();
         console.log("Order data:", data);
-
-        // Resolve the references (user, delivery man, product)
-        const userRef = data.user as DocumentReference; // Document reference for user
-        const deliveryManRef = data.DelivaryMan as DocumentReference; // Document reference for delivery man
-        const productRef = data.Products[0]?.Product as DocumentReference; // Assuming the first product for simplicity
-
+  
         // Resolve user reference
         let userName = 'Unknown User';
-        try {
-          const userSnapshot = await getDoc(userRef);
-          const userData = userSnapshot.data() as User;
-          userName = userData?.userName || 'Unknown User';
-          console.log("User resolved:", userName);
-        } catch (err) {
-          console.error("Error resolving user:", err);
+        if (data.user) {
+          try {
+            console.log("Fetching user data for reference:", data.user.path);
+            const userSnapshot = await getDoc(data.user);
+            if (userSnapshot.exists()) {
+              const userData = userSnapshot.data() as User;
+              userName = userData?.userName || 'Unknown User';
+              console.log("User resolved:", userName);
+            } else {
+              console.warn("User document does not exist for:", data.user.path);
+            }
+          } catch (err) {
+            console.error("Error fetching user data:", err);
+          }
+        } else {
+          console.warn("No user reference found in order:", data);
         }
-
+  
         // Resolve delivery man reference
         let deliveryManName = 'Unknown Delivery Man';
-        try {
-          const deliveryManSnapshot = await getDoc(deliveryManRef);
-          const deliveryManData = deliveryManSnapshot.data() as DeliveryMan;
-          deliveryManName = deliveryManData?.name || 'Unknown Delivery Man';
-          console.log("Delivery Man resolved:", deliveryManName);
-        } catch (err) {
-          console.error("Error resolving delivery man:", err);
+        if (data.DelivaryMan) {
+          try {
+            console.log("Fetching delivery man data for reference:", data.DelivaryMan.path);
+            const deliveryManSnapshot = await getDoc(data.DelivaryMan);
+            if (deliveryManSnapshot.exists()) {
+              const deliveryManData = deliveryManSnapshot.data() as DeliveryMan;
+              deliveryManName = deliveryManData?.name || 'Unknown Delivery Man';
+              console.log("Delivery Man resolved:", deliveryManName);
+            } else {
+              console.warn("Delivery Man document does not exist for:", data.DelivaryMan.path);
+            }
+          } catch (err) {
+            console.error("Error fetching delivery man data:", err);
+          }
+        } else {
+          console.warn("No delivery man reference found in order:", data);
         }
-
+  
         // Resolve product reference
         let productName = 'Unknown Product';
-        try {
-          if (productRef) {
-            const productSnapshot = await getDoc(productRef);
-            const productData = productSnapshot.data() as Product;
-            productName = productData?.name || 'Unknown Product';
-            console.log("Product resolved:", productName);
+        if (data.Products && data.Products[0]?.Product) {
+          try {
+            console.log("Fetching product data for reference:", data.Products[0].Product.path);
+            const productSnapshot = await getDoc(data.Products[0].Product);
+            if (productSnapshot.exists()) {
+              const productData = productSnapshot.data() as Product;
+              productName = productData?.name || 'Unknown Product';
+              console.log("Product resolved:", productName);
+            } else {
+              console.warn("Product document does not exist for:", data.Products[0].Product.path);
+            }
+          } catch (err) {
+            console.error("Error fetching product data:", err);
           }
-        } catch (err) {
-          console.error("Error resolving product:", err);
+        } else {
+          console.warn("No product reference found or invalid format in order:", data.Products);
         }
-
+  
         // Handle the missing fields and build the order data
         ordersData.push({
           address: data.addresse?.address || 'Unknown Address',
@@ -85,12 +104,15 @@ const TableOne = () => {
           productName,
         });
       }
-
+  
       setRecentOrders(ordersData); // Update state with fetched orders
+      console.log("Final resolved orders data:", ordersData);
     } catch (error) {
-      console.error('Error fetching recent orders:', error);
+      console.error("Error fetching recent orders:", error);
     }
   };
+  
+  
 
   useEffect(() => {
     fetchRecentOrders(); // Fetch recent orders when component mounts
