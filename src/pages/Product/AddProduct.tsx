@@ -41,7 +41,7 @@ const AddProduct: React.FC = () => {
   });
 
   const [uploading, setUploading] = useState(false);
-  const [showMoreOptions, setShowMoreOptions] = useState(false); // Add state for "More Options"
+  const [showMoreOptions, setShowMoreOptions] = useState(false);
 
   useEffect(() => {
     const fetchCategoriesAndTypes = async () => {
@@ -126,6 +126,7 @@ const AddProduct: React.FC = () => {
       ingredients: prevState.ingredients.filter((_, i) => i !== index),
     }));
   };
+
   const handleIngredientChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     index: number,
@@ -135,23 +136,24 @@ const AddProduct: React.FC = () => {
     setFormData((prevState) => ({
       ...prevState,
       ingredients: prevState.ingredients.map((ingredient, i) =>
-        i === index ? { ...ingredient, [field]: field === "calories" ? parseFloat(value) || 0 : value } : ingredient
+        i === index
+          ? { ...ingredient, [field]: field === "calories" ? parseFloat(value) || 0 : value }
+          : ingredient
       ),
     }));
   };
-  
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-  
+
     if (!formData.name || formData.price <= 0 || !formData.category || !formData.type) {
       toast.error("Please fill out all required fields.");
       return;
     }
-  
+
     try {
       setUploading(true);
-  
+
       const imageUrls = await Promise.all(
         formData.images.map(async (file) => {
           const storageRef = ref(storage, `product_images/${file.name}`);
@@ -159,22 +161,28 @@ const AddProduct: React.FC = () => {
           return await getDownloadURL(storageRef);
         })
       );
-  
+
       const categoryRef = doc(db, "category", formData.category.id);
-  
+      const typeRef = doc(db, "type", formData.type.value); // Convert type to a document reference
+
       await addDoc(collection(db, "Product"), {
-        ...formData,
+        name: formData.name,
+        description: formData.description,
         price: parseFloat(formData.price.toString()),
         origin: formData.origin || "--",
+        isSpecial: formData.isSpecial,
+        isOffre: formData.isOffre,
+        offrePercentage: formData.offrePercentage,
         allergies: formData.allergies || "--",
         conservationStorage: formData.conservationStorage || "--",
+        ingredients: formData.ingredients,
         images: imageUrls,
-        category: categoryRef,
-        type: formData.type, // Save single type
+        category: categoryRef, // Save category as a document reference
+        type: typeRef, // Save type as a document reference
         creationDate: new Date(),
         status: "In Stock",
       });
-  
+
       toast.success("Product added successfully!");
       setFormData({
         name: "",
