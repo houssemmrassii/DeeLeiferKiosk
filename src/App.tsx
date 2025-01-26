@@ -24,6 +24,8 @@ import EditPromotion from "./pages/Promotion/UpdatePromotion";
 import CommandTable from "./pages/Command/ListCommand";
 import CommandDetail from "./pages/Command/CommandDetail";
 import ListUsers from "./pages/Users/ListUsers";
+import AddZone from "./pages/Zone/AddZone";
+import ListZones from "./pages/Zone/ListZone";
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -217,6 +219,24 @@ function App() {
                     <>
                       <PageTitle title="Profile | TailAdmin - Tailwind CSS Admin Dashboard Template" />
                       <CommandTable />
+                    </>
+                  }
+                />
+                <Route
+                  path="/AddZone"
+                  element={
+                    <>
+                      <PageTitle title="Profile | TailAdmin - Tailwind CSS Admin Dashboard Template" />
+                      <AddZone />
+                    </>
+                  }
+                />
+                <Route
+                  path="/ListZones"
+                  element={
+                    <>
+                      <PageTitle title="Profile | TailAdmin - Tailwind CSS Admin Dashboard Template" />
+                      <ListZones />
                     </>
                   }
                 />
