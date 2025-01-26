@@ -8,6 +8,7 @@ import {
   FaTags,
   FaClipboardList,
   FaSignOutAlt,
+  FaMapMarkerAlt, // Import the map marker icon
 } from "react-icons/fa";
 import Logo from "../../images/logo/Logodeele.svg";
 import SidebarLinkGroup from "./SidebarLinkGroup";
@@ -31,9 +32,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const [sidebarExpanded, setSidebarExpanded] = useState(
     storedSidebarExpanded === null ? false : storedSidebarExpanded === "true"
   );
-
-  // State to control visibility of the carousel
-  const [isCarouselVisible, setIsCarouselVisible] = useState(true);
 
   const handleLogout = () => {
     localStorage.clear();
@@ -74,18 +72,13 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
     }
   }, [sidebarExpanded]);
 
-  // Toggle carousel visibility
-  const toggleCarouselVisibility = () => {
-    setIsCarouselVisible(!isCarouselVisible);
-  };
-
   return (
     <aside
-  ref={sidebar}
-  className={`absolute left-0 top-0 z-50 flex h-screen w-64 flex-col bg-[#1c1f1d] text-[#d6d5c9] transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
-    sidebarOpen ? "translate-x-0" : "-translate-x-full"
-  } overflow-y-auto no-scrollbar`}
->
+      ref={sidebar}
+      className={`absolute left-0 top-0 z-50 flex h-screen w-64 flex-col bg-[#1c1f1d] text-[#d6d5c9] transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
+        sidebarOpen ? "translate-x-0" : "-translate-x-full"
+      } overflow-y-auto no-scrollbar`}
+    >
       {/* Sidebar Header */}
       <div className="flex items-center justify-center px-5 py-5 bg-[#1c1f1d]">
         <NavLink to="/" className="flex items-center">
@@ -113,7 +106,6 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         </button>
       </div>
 
-
       {/* Sidebar Navigation */}
       <div className="flex flex-col overflow-y-auto mt-2">
         <nav className="px-4 py-4">
@@ -132,6 +124,23 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               >
                 <FaHome className="text-lg" />
                 Dashboard
+              </NavLink>
+            </li>
+
+            {/* List Zones */}
+            <li>
+              <NavLink
+                to="/ListZones"
+                className={({ isActive }) =>
+                  `flex items-center gap-4 px-4 py-3 text-sm font-medium rounded-lg ${
+                    isActive
+                      ? "bg-[#b9baa3] text-[#0a100d]"
+                      : "text-[#d6d5c9] hover:bg-[#d6d5c9] hover:text-[#0a100d]"
+                  }`
+                }
+              >
+                <FaMapMarkerAlt className="text-lg" />
+                List Zones
               </NavLink>
             </li>
 

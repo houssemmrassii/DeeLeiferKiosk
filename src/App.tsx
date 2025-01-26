@@ -222,15 +222,27 @@ function App() {
                     </>
                   }
                 />
-                <Route
-                  path="/AddZone"
-                  element={
-                    <>
-                      <PageTitle title="Profile | TailAdmin - Tailwind CSS Admin Dashboard Template" />
-                      <AddZone />
-                    </>
-                  }
-                />
+               <Route
+  path="/AddZone"
+  element={
+    <>
+      <PageTitle title="Profile | TailAdmin - Tailwind CSS Admin Dashboard Template" />
+      <AddZone
+        isEditing={false} // Default to adding a new zone
+        editingZone={null} // No zone to edit initially
+        onClose={() => {
+          // Navigate or close modal logic
+          console.log("AddZone closed");
+        }}
+        onSuccess={() => {
+          // Handle success, like refreshing the list
+          console.log("Zone added successfully");
+        }}
+      />
+    </>
+  }
+/>
+
                 <Route
                   path="/ListZones"
                   element={
