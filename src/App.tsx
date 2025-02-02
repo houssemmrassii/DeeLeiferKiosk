@@ -26,6 +26,7 @@ import CommandDetail from "./pages/Command/CommandDetail";
 import ListUsers from "./pages/Users/ListUsers";
 import AddZone from "./pages/Zone/AddZone";
 import ListZones from "./pages/Zone/ListZone";
+import Profile from "./pages/Authentication/Profile";
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -132,6 +133,15 @@ function App() {
                     </>
                   }
                 />
+                 <Route
+                  path="/profile"
+                  element={
+                    <>
+                      <PageTitle title="Calendar | TailAdmin - Tailwind CSS Admin Dashboard Template" />
+                      <Profile />
+                    </>
+                  }
+                />
                 <Route
                   path="/ListCategories"
                   element={
@@ -217,7 +227,6 @@ function App() {
                   path="/CommandTable"
                   element={
                     <>
-                      <PageTitle title="Profile | TailAdmin - Tailwind CSS Admin Dashboard Template" />
                       <CommandTable />
                     </>
                   }
@@ -226,7 +235,6 @@ function App() {
   path="/AddZone"
   element={
     <>
-      <PageTitle title="Profile | TailAdmin - Tailwind CSS Admin Dashboard Template" />
       <AddZone
         isEditing={false} // Default to adding a new zone
         editingZone={null} // No zone to edit initially
@@ -247,7 +255,6 @@ function App() {
                   path="/ListZones"
                   element={
                     <>
-                      <PageTitle title="Profile | TailAdmin - Tailwind CSS Admin Dashboard Template" />
                       <ListZones />
                     </>
                   }

@@ -85,15 +85,7 @@ const DropdownUser: React.FC = () => {
                 My Profile
               </Link>
             </li>
-            <li>
-              <Link
-                to="/settings"
-                className="flex items-center gap-3 text-sm font-medium text-gray-700 hover:text-primary dark:text-gray-300"
-              >
-                <CogIcon className="w-5 h-5" />
-                Account Settings
-              </Link>
-            </li>
+           
           </ul>
 
           <button

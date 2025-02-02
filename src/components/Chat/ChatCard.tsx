@@ -1,152 +1,83 @@
 import { useEffect, useState } from 'react';
-import { getDocs, collection, getDoc } from 'firebase/firestore';
-import { db } from '../../FirebaseConfig'; // Adjust to your firebase config
+import { getDocs, collection, Timestamp } from 'firebase/firestore';
+import { db } from '../../FirebaseConfig';
 
-interface User {
-  userName: string;
-  phoneNumber: string;
-  email: string;
+interface Promotion {
+  code: string;
+  title: string;
+  dateEnd: Timestamp;
 }
 
-const ChatCard = () => {
-  const [helpMessages, setHelpMessages] = useState<any[]>([]); // Store the fetched help messages
-  const [currentPage, setCurrentPage] = useState(1); // Current page
-  const [messagesPerPage] = useState(5); // Number of messages per page
-  const [totalPages, setTotalPages] = useState(1); // Total number of pages
+const ActivePromotionCard = () => {
+  const [activePromotions, setActivePromotions] = useState<Promotion[]>([]);
 
-  // Fetch HelpMessages from Firestore
-  const fetchHelpMessages = async () => {
+  // Fetch Active Promotions
+  const fetchActivePromotions = async () => {
     try {
-      const querySnapshot = await getDocs(collection(db, 'Helpmessage'));
+      const promotionsSnapshot = await getDocs(collection(db, 'Promotion'));
+      const now = Timestamp.now();
 
-      if (querySnapshot.empty) {
-        console.log('No help messages found.');
-        return;
+      console.log("🔥 Debug: Fetched Promotions from Firestore →", promotionsSnapshot.docs.map(doc => doc.data()));
+
+      const validPromotions: Promotion[] = promotionsSnapshot.docs
+        .map(doc => {
+          const data = doc.data();
+          return {
+            code: data.code || "N/A",
+            title: data.title || "No Title",
+            dateEnd: data.dateEnd as Timestamp, // Ensure it's a Firestore timestamp
+          };
+        })
+        .filter(promo => promo.dateEnd) // Check that the date exists
+        .filter(promo => promo.dateEnd.toMillis() >= now.toMillis()) // Check if promotion is still active
+        .sort((a, b) => a.dateEnd.toMillis() - b.dateEnd.toMillis()); // Sort by closest end date
+
+      console.log("✅ Debug: Active Promotions After Filtering →", validPromotions);
+
+      if (validPromotions.length > 0) {
+        setActivePromotions(validPromotions);
+      } else {
+        console.warn("⚠️ No active promotions found.");
       }
-
-      const messagesData: any[] = [];
-
-      // Loop through Firestore documents and fetch user data
-      for (const docSnapshot of querySnapshot.docs) {
-        const data = docSnapshot.data();
-
-        const userRef = data.user;
-        const userSnapshot = await getDoc(userRef);
-
-        if (userSnapshot.exists()) {
-          const userData = userSnapshot.data() as User;
-          messagesData.push({
-            phoneNumber: data.PhoneNumber,
-            email: data.email,
-            userName: userData.userName,  // Directly using userName from the user data
-            message: data.message,
-          });
-        } else {
-          console.log('No user data found for message:', docSnapshot.id);
-        }
-      }
-
-      setHelpMessages(messagesData); // Update the state with the fetched messages
-      setTotalPages(Math.ceil(messagesData.length / messagesPerPage)); // Set total pages
     } catch (error) {
-      console.error('Error fetching HelpMessages:', error);
+      console.error('❌ Error fetching promotions:', error);
     }
   };
 
-  // Fetch help messages when component mounts
   useEffect(() => {
-    fetchHelpMessages();
+    fetchActivePromotions();
   }, []);
 
-  // Logic for displaying messages for the current page
-  const indexOfLastMessage = currentPage * messagesPerPage;
-  const indexOfFirstMessage = indexOfLastMessage - messagesPerPage;
-  const currentMessages = helpMessages.slice(indexOfFirstMessage, indexOfLastMessage);
-
-  // Change page
-  const paginate = (pageNumber: number) => setCurrentPage(pageNumber);
-
-  // Previous page
-  const previousPage = () => {
-    if (currentPage > 1) {
-      setCurrentPage(currentPage - 1);
-    }
-  };
-
-  // Next page
-  const nextPage = () => {
-    if (currentPage < totalPages) {
-      setCurrentPage(currentPage + 1);
-    }
-  };
-
   return (
-    <div className="col-span-12 rounded-sm border border-stroke bg-white py-6 shadow-default dark:border-strokedark dark:bg-boxdark xl:col-span-4">
-      <h4 className="mb-6 px-7.5 text-xl font-semibold text-black dark:text-white">Help Messages</h4>
-      
-      <div>
-        {currentMessages.length === 0 ? (
-          <p>No messages available.</p>
-        ) : (
-          currentMessages.map((message, key) => (
-            <div key={key} className="flex items-center gap-5 py-3 px-7.5 hover:bg-gray-3 dark:hover:bg-meta-4">
-              <div className="flex flex-1 items-center justify-between">
-                <div>
-                  <h5 className="font-medium text-black dark:text-white">
-                    {message.userName} {/* Directly displaying userName */}
-                  </h5>
-                  <p className="text-sm text-black dark:text-white">
-                    <strong>Email:</strong> {message.email || 'N/A'}
-                  </p>
-                  <p className="text-sm text-black dark:text-white">
-                    <strong>Phone:</strong> {message.phoneNumber || 'N/A'}
-                  </p>
-                  <p>
-                    <span className="text-sm text-black dark:text-white">
-                      <strong>Message:</strong> {message.message || 'No message'}
-                    </span>
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+    <div className="col-span-12 xl:col-span-4 bg-white shadow-lg rounded-lg p-4">
+      <h3 className="text-lg font-semibold text-gray-800 mb-3">Active Promotions</h3>
 
-      {/* Pagination controls */}
-      <div className="flex justify-between items-center mt-6">
-        <button 
-          onClick={() => paginate(1)} 
-          disabled={currentPage === 1} 
-          className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">
-          First
-        </button>
-
-        <button 
-          onClick={previousPage} 
-          disabled={currentPage === 1} 
-          className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">
-          Previous
-        </button>
-
-        <span className="px-3 py-2 text-black dark:text-white">Page {currentPage} of {totalPages}</span>
-
-        <button 
-          onClick={nextPage} 
-          disabled={currentPage === totalPages} 
-          className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">
-          Next
-        </button>
-
-        <button 
-          onClick={() => paginate(totalPages)} 
-          disabled={currentPage === totalPages} 
-          className="px-3 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 disabled:bg-gray-300">
-          Last
-        </button>
-      </div>
+      {activePromotions.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full table-auto text-sm border border-gray-200 rounded-lg">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-2 text-left text-gray-700">Title</th>
+                <th className="px-4 py-2 text-left text-gray-700">Code</th>
+                <th className="px-4 py-2 text-left text-gray-700">End Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activePromotions.map((promo, index) => (
+                <tr key={index} className="border-b border-gray-200 hover:bg-gray-50">
+                  <td className="px-4 py-2">{promo.title}</td>
+                  <td className="px-4 py-2 font-mono text-blue-600">{promo.code}</td>
+                  <td className="px-4 py-2">{promo.dateEnd.toDate().toLocaleDateString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="text-gray-600 text-center py-4">No Active Promotions</p>
+      )}
     </div>
   );
 };
 
-export default ChatCard;
+export default ActivePromotionCard;

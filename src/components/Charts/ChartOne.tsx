@@ -6,9 +6,7 @@ import { collection, getDocs } from 'firebase/firestore';
 
 interface Commande {
   DatePAssCommande: { seconds: number };
-  Status: string;
-  user: { id: string };
-  TotalAmount: number; // Make sure TotalAmount exists in your Firestore data
+  TotalAmount: number;
 }
 
 interface ChartOneState {
@@ -21,88 +19,86 @@ interface ChartOneState {
 
 const ChartOne: React.FC = () => {
   const [state, setState] = useState<ChartOneState>({
-    series: [
-      {
-        name: 'Commands',
-        data: [],
-      },
-    ],
+    series: [{ name: 'Total Revenue', data: [] }],
     categories: [],
   });
+
+  const [selectedView, setSelectedView] = useState<'weekly' | 'monthly'>('weekly');
 
   useEffect(() => {
     const fetchData = async () => {
       const commandesSnapshot = await getDocs(collection(db, 'Commande'));
       const commandesData: Commande[] = commandesSnapshot.docs.map((doc) => doc.data() as Commande);
-    
-      // Group data by day and month with total prices
-      const dailyData: { [key: string]: number } = {};
+
+      const weeklyData: { [key: string]: number } = {};
       const monthlyData: { [key: string]: number } = {};
-    
+
       commandesData.forEach((command) => {
-        // Check if DatePAssCommande exists and is a valid timestamp
         if (command.DatePAssCommande && command.DatePAssCommande.seconds) {
           const date = new Date(command.DatePAssCommande.seconds * 1000);
-          const dayKey = date.toLocaleDateString();
-          const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
-    
-          // Add the totalAmount to the daily or monthly data
+          const year = date.getFullYear();
+
+          // Get week number
+          const firstDayOfYear = new Date(year, 0, 1);
+          const pastDaysOfYear = (date.getTime() - firstDayOfYear.getTime()) / (1000 * 60 * 60 * 24);
+          const weekNumber = Math.ceil((pastDaysOfYear + firstDayOfYear.getDay() + 1) / 7);
+          const weekKey = `Week ${weekNumber}, ${year}`;
+
+          // Get month key as "YYYY-MM"
+          const monthKey = `${year}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+
+          // Accumulate revenue
           const amount = command.TotalAmount || 0;
-    
-          // Accumulate the total amount for that day
-          dailyData[dayKey] = (dailyData[dayKey] || 0) + amount;
-    
-          // Accumulate the total amount for that month
+          weeklyData[weekKey] = (weeklyData[weekKey] || 0) + amount;
           monthlyData[monthKey] = (monthlyData[monthKey] || 0) + amount;
-        } else {
-          console.error('Missing DatePAssCommande timestamp in Commande data');
         }
       });
-    
-      // Prepare data for chart
-      const dailyCategories = Object.keys(dailyData);
-      const dailyTotalPrices = dailyCategories.map((day) => dailyData[day]);
-    
-      const monthlyCategories = Object.keys(monthlyData);
-      const monthlyTotalPrices = monthlyCategories.map((month) => monthlyData[month]);
-    
-      // Set state with daily data initially
-      setState({
-        series: [
-          {
-            name: 'Total Revenue',
-            data: dailyTotalPrices,
-          },
-        ],
-        categories: dailyCategories,
-      });
-    
-      // If you want to switch to monthly data, use the following:
-      // setState({
-      //   series: [
-      //     {
-      //       name: 'Total Revenue',
-      //       data: monthlyTotalPrices,
-      //     },
-      //   ],
-      //   categories: monthlyCategories,
-      // });
-    };
-    
-    fetchData();
-  }, []);
 
-  // Move options inside the component to access state
+      // **Sort weekly data correctly**
+      const sortedWeeklyCategories = Object.keys(weeklyData).sort((a, b) => {
+        const weekA = parseInt(a.split(' ')[1]); // Extract week number
+        const weekB = parseInt(b.split(' ')[1]);
+        return weekA - weekB;
+      });
+
+      const weeklyTotalPrices = sortedWeeklyCategories.map((week) => parseFloat(weeklyData[week].toFixed(2)));
+
+      // **Sort months correctly based on actual time**
+      const sortedMonthlyCategories = Object.keys(monthlyData)
+        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime()) // Sort by date
+        .map((monthKey) => {
+          const [year, month] = monthKey.split('-');
+          return `${new Date(parseInt(year), parseInt(month) - 1).toLocaleString('default', { month: 'long' })} ${year}`;
+        });
+
+      const monthlyTotalPrices = Object.keys(monthlyData)
+        .sort((a, b) => new Date(a).getTime() - new Date(b).getTime()) // Sort by date
+        .map((month) => parseFloat(monthlyData[month].toFixed(2)));
+
+      if (selectedView === 'weekly') {
+        setState({
+          series: [{ name: 'Total Revenue', data: weeklyTotalPrices }],
+          categories: sortedWeeklyCategories,
+        });
+      } else {
+        setState({
+          series: [{ name: 'Total Revenue', data: monthlyTotalPrices }],
+          categories: sortedMonthlyCategories,
+        });
+      }
+    };
+
+    fetchData();
+  }, [selectedView]);
+
   const options: ApexOptions = {
     legend: {
       show: true,
       position: 'top',
       horizontalAlign: 'center',
-      labels: {
-        useSeriesColors: true,
-      },
+      labels: { useSeriesColors: true },
     },
-    colors: ['#3C50E0'], // Blue color for the total revenue
+    colors: ['#3C50E0'],
     chart: {
       fontFamily: 'Satoshi, sans-serif',
       height: 335,
@@ -115,91 +111,60 @@ const ChartOne: React.FC = () => {
         left: 0,
         opacity: 0.1,
       },
-      toolbar: {
-        show: false,
-      },
+      toolbar: { show: false },
     },
-    responsive: [
-      {
-        breakpoint: 1024,
-        options: {
-          chart: {
-            height: 300,
-          },
-        },
-      },
-      {
-        breakpoint: 1366,
-        options: {
-          chart: {
-            height: 350,
-          },
-        },
-      },
-    ],
     stroke: {
       width: [2, 2],
-      curve: 'straight',
+      curve: 'smooth',
     },
     grid: {
-      xaxis: {
-        lines: {
-          show: true,
-        },
-      },
-      yaxis: {
-        lines: {
-          show: true,
-        },
-      },
+      xaxis: { lines: { show: true } },
+      yaxis: { lines: { show: true } },
     },
-    dataLabels: {
-      enabled: false,
-    },
+    dataLabels: { enabled: false },
     markers: {
       size: 4,
       colors: '#fff',
       strokeColors: '#3056D3',
       strokeWidth: 3,
       strokeOpacity: 0.9,
-      strokeDashArray: 0,
       fillOpacity: 1,
-      hover: {
-        size: undefined,
-        sizeOffset: 5,
-      },
+      hover: { sizeOffset: 5 },
     },
     xaxis: {
       type: 'category',
-      categories: state.categories, // Categories will be the dates (daily or monthly)
-      axisBorder: {
-        show: false,
-      },
-      axisTicks: {
-        show: false,
-      },
+      categories: state.categories,
+      axisBorder: { show: false },
+      axisTicks: { show: false },
     },
     yaxis: {
-      title: {
-        text: 'Total Revenue (€)',
-        style: {
-          fontSize: '12px',
-        },
-      },
+      title: { text: 'Total Revenue (€)', style: { fontSize: '12px' } },
+      labels: { formatter: (value) => `€${value.toFixed(2)}` },
       min: 0,
-      max: Math.max(...state.series[0].data) * 1.2, // Dynamically set max based on the data
+      max: Math.max(...state.series[0].data, 100) * 1.2,
+    },
+    tooltip: {
+      y: { formatter: (value) => `€${value.toFixed(2)}` },
     },
   };
 
   return (
-    <div className="col-span-12 rounded-sm border border-stroke bg-white px-5 pt-7.5 pb-5 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:col-span-8">
+    <div className="col-span-12 rounded-sm border border-stroke bg-white px-5 pt-5 pb-5 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:col-span-8">
+      {/* Filter Dropdown */}
+      <div className="flex justify-between items-center mb-5">
+        <h4 className="text-lg font-semibold text-gray-900 dark:text-white">Revenue Growth</h4>
+        <select
+          value={selectedView}
+          onChange={(e) => setSelectedView(e.target.value as 'weekly' | 'monthly')}
+          className="border border-gray-300 dark:border-gray-600 bg-white dark:bg-boxdark text-gray-800 dark:text-white py-2 px-4 rounded-md"
+        >
+          <option value="weekly">Weekly Growth</option>
+          <option value="monthly">Monthly Growth</option>
+        </select>
+      </div>
+
       <div id="chartOne" className="-ml-5">
-        <ReactApexChart
-          options={options}
-          series={state.series}
-          type="area"
-          height={350}
-        />
+        <ReactApexChart options={options} series={state.series} type="area" height={350} />
       </div>
     </div>
   );

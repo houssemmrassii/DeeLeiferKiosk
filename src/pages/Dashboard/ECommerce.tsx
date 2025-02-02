@@ -12,6 +12,7 @@ import ChatCard from "../../components/Chat/ChatCard";
 import MapOne from "../../components/Maps/MapOne";
 import TableOne from "../../components/Tables/TableOne";
 import Leaderboard from "../../components/Charts/ChartTwo";
+import ActivePromotionCard from "../../components/Chat/ChatCard";
 interface Market {
   id: string;
   delivaryfees: number;
@@ -194,7 +195,7 @@ const ECommerce: React.FC = () => {
         <div className="col-span-12 xl:col-span-8">
           <TableOne />
         </div>
-        <ChatCard />
+        <ActivePromotionCard />
       </div>
     </div>
   );

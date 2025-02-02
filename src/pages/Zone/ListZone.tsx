@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { db } from "../../FirebaseConfig";
-import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
+import { collection, getDocs, deleteDoc, doc, updateDoc } from "firebase/firestore";
 import { ToastContainer, toast } from "react-toastify";
 import { FaTrashAlt, FaEdit, FaPlus } from "react-icons/fa";
 import "react-toastify/dist/ReactToastify.css";
@@ -9,39 +9,44 @@ import AddZone from "./AddZone";
 
 interface Zone {
   id: string;
-  name: string; // Zone name
+  name: string;
   GeoPoint: { latitude: number; longitude: number };
   MinimumOrderAmount: number;
   ZIPCode: string;
   isOpen: boolean;
+  Area: number;
 }
 
 const ListZones: React.FC = () => {
   const [zones, setZones] = useState<Zone[]>([]);
   const [filteredZones, setFilteredZones] = useState<Zone[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterOpen, setFilterOpen] = useState<string>(""); // Filter for open/closed
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1); // Current page
-  const zonesPerPage = 10; // Zones per page
+  const [filterOpen, setFilterOpen] = useState<string>("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const zonesPerPage = 10;
 
   // Modal state
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingZone, setEditingZone] = useState<Zone | null>(null);
 
+  // Approval Modal State
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
+
   const fetchZones = async () => {
     try {
       const zoneSnapshot = await getDocs(collection(db, "Zone"));
-      const zonesData = zoneSnapshot.docs
-        .map((doc) => ({
+      const zonesData: Zone[] = zoneSnapshot.docs.map((doc) => {
+        const data = doc.data() as Omit<Zone, "id">;
+        return {
           id: doc.id,
-          ...doc.data(),
-        }))
-        .sort((a, b) => b.id.localeCompare(a.id)) as Zone[]; // Sort by newest first
+          ...data,
+        };
+      });
 
       setZones(zonesData);
-      setFilteredZones(zonesData); // Initialize filtered zones
+      setFilteredZones(zonesData);
     } catch (error) {
       console.error("Error fetching zones:", error);
       toast.error("Failed to fetch zones.");
@@ -55,7 +60,7 @@ const ListZones: React.FC = () => {
   const handleDeleteZone = async (id: string) => {
     try {
       await deleteDoc(doc(db, "Zone", id));
-      fetchZones(); // Refresh the list
+      fetchZones();
       toast.success("Zone deleted successfully!");
     } catch (error) {
       console.error("Error deleting zone:", error);
@@ -65,7 +70,6 @@ const ListZones: React.FC = () => {
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-
     const lowerQuery = query.toLowerCase();
     const filtered = zones.filter(
       (zone) =>
@@ -73,27 +77,21 @@ const ListZones: React.FC = () => {
         zone.name.toLowerCase().includes(lowerQuery)
     );
     setFilteredZones(filtered);
-    setCurrentPage(1); // Reset to first page after filtering
+    setCurrentPage(1);
   };
 
   const handleFilterChange = (value: string) => {
     setFilterOpen(value);
-
     if (value) {
-      const filtered = zones.filter(
-        (zone) => zone.isOpen.toString() === value
-      );
+      const filtered = zones.filter((zone) => zone.isOpen.toString() === value);
       setFilteredZones(filtered);
     } else {
-      setFilteredZones(zones); // Show all if no filter
+      setFilteredZones(zones);
     }
-    setCurrentPage(1); // Reset to first page after filtering
+    setCurrentPage(1);
   };
 
-  const handlePageChange = (
-    event: React.ChangeEvent<unknown>,
-    value: number
-  ) => {
+  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
     setCurrentPage(value);
   };
 
@@ -112,21 +110,39 @@ const ListZones: React.FC = () => {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingZone(null);
-    fetchZones(); // Refresh zones after closing modal
+    fetchZones();
   };
 
-  // Calculate zones for the current page
+  const confirmToggleZoneStatus = async () => {
+    if (!selectedZone) return;
+    try {
+      const zoneRef = doc(db, "Zone", selectedZone.id);
+      await updateDoc(zoneRef, { isOpen: !selectedZone.isOpen });
+      toast.success(`Zone is now ${selectedZone.isOpen ? "closed" : "open"}!`);
+      fetchZones();
+    } catch (error) {
+      console.error("Error updating zone status:", error);
+      toast.error("Failed to update zone status.");
+    }
+    setConfirmModalOpen(false);
+  };
+
+  const openConfirmModal = (zone: Zone) => {
+    setSelectedZone(zone);
+    setConfirmModalOpen(true);
+  };
+
+  // Pagination logic
   const startIndex = (currentPage - 1) * zonesPerPage;
   const currentZones = filteredZones.slice(startIndex, startIndex + zonesPerPage);
 
   return (
     <div className="p-6 bg-white rounded-lg shadow-md dark:bg-[#0a100d]">
       <ToastContainer />
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-800 dark:text-[#d6d5c9]">
-          Zone List
-        </h1>
+        <h1 className="text-xl font-semibold text-gray-800 dark:text-[#d6d5c9]">Zone List</h1>
         <button
           onClick={openAddZoneModal}
           className="bg-[#a22c29] text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-[#902923] transition"
@@ -136,19 +152,19 @@ const ListZones: React.FC = () => {
         </button>
       </div>
 
-      {/* Search and Filter */}
+      {/* Search & Filter */}
       <div className="flex justify-between mb-6 space-x-4">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => handleSearch(e.target.value)}
           placeholder="Search by name or ZIP code"
-          className="w-full rounded-lg border-[1.5px] border-gray-300 dark:border-[#b9baa3] bg-transparent py-3 px-4 text-gray-800 dark:bg-[#b9baa3] dark:text-[#0a100d] focus:outline-none focus:ring-2 focus:ring-[#a22c29]"
+          className="w-full rounded-lg border-[1.5px] py-3 px-4"
         />
         <select
           value={filterOpen}
           onChange={(e) => handleFilterChange(e.target.value)}
-          className="rounded-lg border-[1.5px] border-gray-300 dark:border-[#b9baa3] bg-transparent py-3 px-4 text-gray-800 dark:bg-[#b9baa3] dark:text-[#0a100d] focus:outline-none focus:ring-2 focus:ring-[#a22c29]"
+          className="rounded-lg border-[1.5px] py-3 px-4"
         >
           <option value="">All</option>
           <option value="true">Open</option>
@@ -160,64 +176,54 @@ const ListZones: React.FC = () => {
       <div className="overflow-x-auto">
         <table className="w-full table-auto border-collapse">
           <thead>
-            <tr className="bg-gray-100 dark:bg-[#b9baa3] text-left">
-              <th className="px-4 py-2 font-medium text-gray-600 dark:text-[#0a100d]">
-                Name
-              </th>
-              <th className="px-4 py-2 font-medium text-gray-600 dark:text-[#0a100d]">
-                GeoPoint
-              </th>
-              <th className="px-4 py-2 font-medium text-gray-600 dark:text-[#0a100d]">
-                Minimum Order Amount
-              </th>
-              <th className="px-4 py-2 font-medium text-gray-600 dark:text-[#0a100d]">
-                ZIP Code
-              </th>
-              <th className="px-4 py-2 font-medium text-gray-600 dark:text-[#0a100d]">
-                Is Open
-              </th>
-              <th className="px-4 py-2 font-medium text-gray-600 dark:text-[#0a100d]">
-                Actions
-              </th>
+            <tr className="bg-gray-100 text-left">
+              <th className="px-4 py-2">Name</th>
+              <th className="px-4 py-2">GeoPoint</th>
+              <th className="px-4 py-2">Minimum Order Amount</th>
+              <th className="px-4 py-2">ZIP Code</th>
+              <th className="px-4 py-2">Area (km²)</th>
+              <th className="px-4 py-2">Is Open</th>
+              <th className="px-4 py-2">Actions</th>
             </tr>
           </thead>
           <tbody>
             {currentZones.map((zone) => (
-              <tr
-                key={zone.id}
-                className="border-t hover:bg-gray-100 dark:hover:bg-[#d6d5c9]"
-              >
-                <td className="px-4 py-2 text-gray-800 dark:text-[#d6d5c9]">
-                  {zone.name}
-                </td>
-                <td className="px-4 py-2 text-gray-800 dark:text-[#d6d5c9]">
-                  {zone.GeoPoint.latitude}, {zone.GeoPoint.longitude}
-                </td>
-                <td className="px-4 py-2 text-gray-800 dark:text-[#d6d5c9]">
-                  ${zone.MinimumOrderAmount.toFixed(2)}
-                </td>
-                <td className="px-4 py-2 text-gray-800 dark:text-[#d6d5c9]">
-                  {zone.ZIPCode}
-                </td>
-                <td className="px-4 py-2 text-gray-800 dark:text-[#d6d5c9]">
-                  {zone.isOpen ? "Yes" : "No"}
-                </td>
-                <td className="px-4 py-2 flex items-center space-x-4">
+              <tr key={zone.id} className="border-t hover:bg-gray-100">
+                <td className="px-4 py-2">{zone.name}</td>
+                <td className="px-4 py-2">{zone.GeoPoint.latitude}, {zone.GeoPoint.longitude}</td>
+                <td className="px-4 py-2">${zone.MinimumOrderAmount.toFixed(2)}</td>
+                <td className="px-4 py-2">{zone.ZIPCode}</td>
+                <td className="px-4 py-2">{zone.Area} km²</td>
+                <td className="px-4 py-2">
                   <button
-                    onClick={() => openEditZoneModal(zone)}
-                    className="text-gray-500 hover:text-blue-500 transition"
-                    title="Edit"
+                    className={`px-4 py-1 rounded-full text-sm font-semibold
+                      ${zone.isOpen ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"} 
+                      hover:opacity-80 transition`}
+                    onClick={() => openConfirmModal(zone)}
                   >
-                    <FaEdit />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteZone(zone.id)}
-                    className="text-gray-500 hover:text-red-500 transition"
-                    title="Delete"
-                  >
-                    <FaTrashAlt />
+                    {zone.isOpen ? "Open" : "Closed"}
                   </button>
                 </td>
+                <td className="px-4 py-2 flex space-x-4">
+  {/* Edit Button */}
+  <button 
+    onClick={() => openEditZoneModal(zone)} 
+    className="text-gray-500 hover:text-blue-500 transition-colors duration-200"
+    title="Edit Zone"
+  >
+    <FaEdit />
+  </button>
+
+  {/* Delete Button */}
+  <button 
+    onClick={() => handleDeleteZone(zone.id)} 
+    className="text-gray-500 hover:text-red-500 transition-colors duration-200"
+    title="Delete Zone"
+  >
+    <FaTrashAlt />
+  </button>
+</td>
+
               </tr>
             ))}
           </tbody>
@@ -226,23 +232,8 @@ const ListZones: React.FC = () => {
 
       {/* Pagination */}
       <div className="flex justify-center mt-6">
-        <Pagination
-          count={Math.ceil(filteredZones.length / zonesPerPage)}
-          page={currentPage}
-          onChange={handlePageChange}
-          color="primary"
-        />
+        <Pagination count={Math.ceil(filteredZones.length / zonesPerPage)} page={currentPage} onChange={handlePageChange} />
       </div>
-
-      {/* Add/Edit Modal */}
-      {isModalOpen && (
-        <AddZone
-          isEditing={isEditing}
-          editingZone={editingZone}
-          onClose={closeModal}
-          onSuccess={closeModal}
-        />
-      )}
     </div>
   );
 };

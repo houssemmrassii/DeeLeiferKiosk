@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
-import { getDocs, collection, getDoc, query, orderBy, limit, DocumentReference } from 'firebase/firestore';
-import { db } from '../../FirebaseConfig'; // Adjust to your firebase config
+import { getDocs, collection, getDoc, query, orderBy, limit } from 'firebase/firestore';
+import { db } from '../../FirebaseConfig';
 
-// Define types for the references
+// Define types for Firestore references
 interface User {
-  userName: string;
-}
-
-interface DeliveryMan {
-  name: string;
+  firstName?: string;
+  secondName?: string;
+  display_name?: string;
 }
 
 interface Product {
@@ -16,159 +14,105 @@ interface Product {
 }
 
 const TableOne = () => {
-  const [recentOrders, setRecentOrders] = useState<any[]>([]); // Store the recent orders
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
 
   // Fetch recent orders from Firestore
   const fetchRecentOrders = async () => {
     try {
-      console.log("Fetching recent orders...");
-  
       const ordersQuery = query(collection(db, 'Commande'), orderBy('DatePAssCommande', 'desc'), limit(5));
       const querySnapshot = await getDocs(ordersQuery);
-      console.log("Number of orders fetched:", querySnapshot.size);
-  
+
       const ordersData: any[] = [];
-  
+
       for (const docSnapshot of querySnapshot.docs) {
         const data = docSnapshot.data();
-        console.log("Order data:", data);
-  
+
         // Resolve user reference
         let userName = 'Unknown User';
         if (data.user) {
           try {
-            console.log("Fetching user data for reference:", data.user.path);
             const userSnapshot = await getDoc(data.user);
             if (userSnapshot.exists()) {
               const userData = userSnapshot.data() as User;
-              userName = userData?.userName || 'Unknown User';
-              console.log("User resolved:", userName);
+              userName = userData?.firstName && userData?.secondName
+                ? `${userData.firstName} ${userData.secondName}`
+                : userData?.display_name || 'Unknown User';
             } else {
               console.warn("User document does not exist for:", data.user.path);
             }
           } catch (err) {
             console.error("Error fetching user data:", err);
           }
-        } else {
-          console.warn("No user reference found in order:", data);
         }
-  
-        // Resolve delivery man reference
-        let deliveryManName = 'Unknown Delivery Man';
-        if (data.DelivaryMan) {
-          try {
-            console.log("Fetching delivery man data for reference:", data.DelivaryMan.path);
-            const deliveryManSnapshot = await getDoc(data.DelivaryMan);
-            if (deliveryManSnapshot.exists()) {
-              const deliveryManData = deliveryManSnapshot.data() as DeliveryMan;
-              deliveryManName = deliveryManData?.name || 'Unknown Delivery Man';
-              console.log("Delivery Man resolved:", deliveryManName);
-            } else {
-              console.warn("Delivery Man document does not exist for:", data.DelivaryMan.path);
-            }
-          } catch (err) {
-            console.error("Error fetching delivery man data:", err);
+
+        // Resolve product references and count number of items purchased
+        let totalProductsPurchased = 0;
+        if (Array.isArray(data.Products)) {
+          for (const productEntry of data.Products) {
+            totalProductsPurchased += productEntry.Quantity || 1;
           }
-        } else {
-          console.warn("No delivery man reference found in order:", data);
         }
-  
-        // Resolve product reference
-        let productName = 'Unknown Product';
-        if (data.Products && data.Products[0]?.Product) {
-          try {
-            console.log("Fetching product data for reference:", data.Products[0].Product.path);
-            const productSnapshot = await getDoc(data.Products[0].Product);
-            if (productSnapshot.exists()) {
-              const productData = productSnapshot.data() as Product;
-              productName = productData?.name || 'Unknown Product';
-              console.log("Product resolved:", productName);
-            } else {
-              console.warn("Product document does not exist for:", data.Products[0].Product.path);
-            }
-          } catch (err) {
-            console.error("Error fetching product data:", err);
-          }
-        } else {
-          console.warn("No product reference found or invalid format in order:", data.Products);
-        }
-  
+
+        // Resolve status
+        const orderStatus = data.status || 'Unknown Status';
+
         // Handle the missing fields and build the order data
         ordersData.push({
           address: data.addresse?.address || 'Unknown Address',
-          location: data.addresse?.location || [0, 0], // Default location if missing
-          status: data.Status || 'Unknown Status',
+          status: orderStatus,
           totalAmount: data.TotalAmount || 0,
           userName,
-          deliveryManName,
-          productName,
+          totalProductsPurchased,
         });
       }
-  
-      setRecentOrders(ordersData); // Update state with fetched orders
-      console.log("Final resolved orders data:", ordersData);
+
+      setRecentOrders(ordersData);
     } catch (error) {
       console.error("Error fetching recent orders:", error);
     }
   };
-  
-  
 
   useEffect(() => {
-    fetchRecentOrders(); // Fetch recent orders when component mounts
+    fetchRecentOrders();
   }, []);
 
   return (
-    <div className="rounded-sm border border-stroke bg-white px-5 pt-6 pb-2.5 shadow-default dark:border-strokedark dark:bg-boxdark sm:px-7.5 xl:pb-1">
-      <h4 className="mb-6 text-xl font-semibold text-black dark:text-white">
-        Recent Orders
-      </h4>
+    <div className="rounded-lg border border-stroke bg-white px-5 py-5 shadow-md dark:border-strokedark dark:bg-boxdark">
+      <h4 className="mb-4 text-lg font-semibold text-gray-900 dark:text-white">Recent Orders</h4>
 
-      <div className="flex flex-col">
-        <div className="grid grid-cols-4 rounded-sm bg-gray-2 dark:bg-meta-4 sm:grid-cols-5">
-          <div className="p-2.5 xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">User</h5>
-          </div>
-          <div className="p-2.5 text-center xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">Address</h5>
-          </div>
-          <div className="p-2.5 text-center xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">Status</h5>
-          </div>
-          <div className="hidden p-2.5 text-center sm:block xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">Total Amount</h5>
-          </div>
-          <div className="hidden p-2.5 text-center sm:block xl:p-5">
-            <h5 className="text-sm font-medium uppercase xsm:text-base">Product</h5>
-          </div>
-        </div>
-
-        {recentOrders.map((order, key) => (
-          <div
-            className={`grid grid-cols-4 sm:grid-cols-5 ${key === recentOrders.length - 1 ? '' : 'border-b border-stroke dark:border-strokedark'}`}
-            key={key}
-          >
-            <div className="flex items-center gap-3 p-2.5 xl:p-5">
-              <p className="text-black dark:text-white">{order.userName}</p>
-            </div>
-
-            <div className="flex items-center justify-center p-2.5 xl:p-5">
-              <p className="text-black dark:text-white">{order.address}</p>
-            </div>
-
-            <div className="flex items-center justify-center p-2.5 xl:p-5">
-              <p className="text-meta-3">{order.status}</p>
-            </div>
-
-            <div className="hidden items-center justify-center p-2.5 sm:flex xl:p-5">
-              <p className="text-black dark:text-white">${order.totalAmount.toFixed(2)}</p>
-            </div>
-
-            <div className="hidden items-center justify-center p-2.5 sm:flex xl:p-5">
-              <p className="text-meta-5">{order.productName}</p>
-            </div>
-          </div>
-        ))}
+      <div className="overflow-x-auto">
+        <table className="w-full border-collapse text-sm">
+          <thead className="bg-gray-100 dark:bg-gray-800">
+            <tr>
+              <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300">User</th>
+              <th className="px-3 py-2 text-left text-gray-700 dark:text-gray-300 w-1/3">Address</th>
+              <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Status</th>
+              <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Total</th>
+              <th className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">Items</th>
+            </tr>
+          </thead>
+          <tbody>
+            {recentOrders.map((order, index) => (
+              <tr key={index} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-900">
+                <td className="px-3 py-2 text-gray-900 dark:text-white">{order.userName}</td>
+                <td className="px-3 py-2 text-gray-900 dark:text-white truncate max-w-xs">{order.address}</td>
+                <td className="px-3 py-2 text-center">
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      order.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                      order.status === 'Delivered' ? 'bg-green-100 text-green-700' :
+                      'bg-gray-100 text-gray-700'
+                    }`}
+                  >
+                    {order.status}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-center text-gray-900 dark:text-white">€{order.totalAmount.toFixed(2)}</td>
+                <td className="px-3 py-2 text-center text-gray-900 dark:text-white">{order.totalProductsPurchased} items</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

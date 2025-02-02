@@ -4,12 +4,13 @@ import { db } from "../../FirebaseConfig";
 import { toast } from "react-toastify";
 
 interface Zone {
-  id?: string; // Firebase-provided ID
-  name: string; // Name of the zone
+  id?: string;
+  name: string;
   GeoPoint: { latitude: number; longitude: number };
   MinimumOrderAmount: number;
   ZIPCode: string;
   isOpen: boolean;
+  Area: number; // New field for Area
 }
 
 interface AddZoneProps {
@@ -26,11 +27,12 @@ const AddZone: React.FC<AddZoneProps> = ({ isEditing, editingZone, onClose, onSu
     MinimumOrderAmount: 0,
     ZIPCode: "",
     isOpen: false,
+    Area: 0, // Initialize Area
   });
 
   useEffect(() => {
     if (isEditing && editingZone) {
-      setZoneData(editingZone); // Prefill form if editing
+      setZoneData({ ...editingZone });
     } else {
       setZoneData({
         name: "",
@@ -38,11 +40,12 @@ const AddZone: React.FC<AddZoneProps> = ({ isEditing, editingZone, onClose, onSu
         MinimumOrderAmount: 0,
         ZIPCode: "",
         isOpen: false,
+        Area: 0,
       });
     }
   }, [isEditing, editingZone]);
 
-  const handleChange = (field: string, value: any) => {
+  const handleChange = (field: keyof Zone, value: any) => {
     setZoneData((prev) => ({
       ...prev,
       [field]: value,
@@ -53,21 +56,15 @@ const AddZone: React.FC<AddZoneProps> = ({ isEditing, editingZone, onClose, onSu
     e.preventDefault();
     try {
       if (isEditing && editingZone?.id) {
-        // Update existing zone using the Firebase `id`
         const zoneRef = doc(db, "Zone", editingZone.id);
-        const updatedData = {
-          ...zoneData,
-          GeoPoint: { ...zoneData.GeoPoint },
-        };
-        await updateDoc(zoneRef, updatedData); // Update the document
+        await updateDoc(zoneRef, { ...zoneData });
         toast.success("Zone updated successfully!");
       } else {
-        // Add a new zone
-        await addDoc(collection(db, "Zone"), zoneData); // Add a new document
+        await addDoc(collection(db, "Zone"), zoneData);
         toast.success("Zone added successfully!");
       }
-      onSuccess(); // Notify parent to refresh data
-      onClose(); // Close modal
+      onSuccess();
+      onClose();
     } catch (error) {
       console.error("Error saving zone:", error);
       toast.error("Failed to save zone.");
@@ -82,7 +79,7 @@ const AddZone: React.FC<AddZoneProps> = ({ isEditing, editingZone, onClose, onSu
         </h2>
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Name */}
+            {/* Zone Name */}
             <div>
               <label className="block text-sm font-medium text-gray-800 dark:text-[#d6d5c9] mb-2">
                 Zone Name
@@ -95,6 +92,20 @@ const AddZone: React.FC<AddZoneProps> = ({ isEditing, editingZone, onClose, onSu
               />
             </div>
 
+            {/* Area */}
+            <div>
+              <label className="block text-sm font-medium text-gray-800 dark:text-[#d6d5c9] mb-2">
+                Area (in square km)
+              </label>
+              <input
+                type="number"
+                value={zoneData.Area}
+                onChange={(e) => handleChange("Area", parseFloat(e.target.value) || 0)}
+                className="w-full rounded-lg border-[1.5px] py-2 px-4"
+                min="0"
+              />
+            </div>
+
             {/* Latitude */}
             <div>
               <label className="block text-sm font-medium text-gray-800 dark:text-[#d6d5c9] mb-2">
@@ -104,7 +115,7 @@ const AddZone: React.FC<AddZoneProps> = ({ isEditing, editingZone, onClose, onSu
                 type="number"
                 value={zoneData.GeoPoint.latitude}
                 onChange={(e) =>
-                  handleChange("GeoPoint", { ...zoneData.GeoPoint, latitude: parseFloat(e.target.value) })
+                  handleChange("GeoPoint", { ...zoneData.GeoPoint, latitude: parseFloat(e.target.value) || 0 })
                 }
                 className="w-full rounded-lg border-[1.5px] py-2 px-4"
                 step="any"
@@ -120,7 +131,7 @@ const AddZone: React.FC<AddZoneProps> = ({ isEditing, editingZone, onClose, onSu
                 type="number"
                 value={zoneData.GeoPoint.longitude}
                 onChange={(e) =>
-                  handleChange("GeoPoint", { ...zoneData.GeoPoint, longitude: parseFloat(e.target.value) })
+                  handleChange("GeoPoint", { ...zoneData.GeoPoint, longitude: parseFloat(e.target.value) || 0 })
                 }
                 className="w-full rounded-lg border-[1.5px] py-2 px-4"
                 step="any"
@@ -135,8 +146,9 @@ const AddZone: React.FC<AddZoneProps> = ({ isEditing, editingZone, onClose, onSu
               <input
                 type="number"
                 value={zoneData.MinimumOrderAmount}
-                onChange={(e) => handleChange("MinimumOrderAmount", parseFloat(e.target.value))}
+                onChange={(e) => handleChange("MinimumOrderAmount", parseFloat(e.target.value) || 0)}
                 className="w-full rounded-lg border-[1.5px] py-2 px-4"
+                min="0"
               />
             </div>
 
@@ -170,7 +182,7 @@ const AddZone: React.FC<AddZoneProps> = ({ isEditing, editingZone, onClose, onSu
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-gray-300 dark:bg-[#d6d5c9] text-gray-800 dark:text-[#0a100d] rounded-lg"
+              className="px-4 py-2 bg-gray-300 dark:bg-[#d6d5c9] text-gray-800 rounded-lg"
             >
               Cancel
             </button>
