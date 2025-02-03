@@ -23,27 +23,49 @@ const ListZones: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterOpen, setFilterOpen] = useState<string>("");
   const [currentPage, setCurrentPage] = useState(1);
+  const [loading, setLoading] = useState(true);
   const zonesPerPage = 10;
 
-  // Modal state
+  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editingZone, setEditingZone] = useState<Zone | null>(null);
 
-  // Approval Modal State
+  // Confirmation Modal States
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [selectedZone, setSelectedZone] = useState<Zone | null>(null);
 
+  useEffect(() => {
+    fetchZones();
+  }, []);
+
+  useEffect(() => {
+    let filtered = zones;
+  
+    if (searchQuery) {
+      filtered = filtered.filter((zone) =>
+        zone.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        zone.ZIPCode.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+  
+    if (filterOpen !== "") {
+      filtered = filtered.filter((zone) => zone.isOpen === (filterOpen === "true"));
+    }
+  
+    setFilteredZones(filtered);
+  }, [searchQuery, filterOpen, zones]);
+  
+
   const fetchZones = async () => {
+    setLoading(true);
     try {
       const zoneSnapshot = await getDocs(collection(db, "Zone"));
-      const zonesData: Zone[] = zoneSnapshot.docs.map((doc) => {
-        const data = doc.data() as Omit<Zone, "id">;
-        return {
-          id: doc.id,
-          ...data,
-        };
-      });
+      const zonesData: Zone[] = zoneSnapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }) as Zone);
 
       setZones(zonesData);
       setFilteredZones(zonesData);
@@ -51,48 +73,34 @@ const ListZones: React.FC = () => {
       console.error("Error fetching zones:", error);
       toast.error("Failed to fetch zones.");
     }
+    setLoading(false);
   };
 
-  useEffect(() => {
-    fetchZones();
-  }, []);
-
-  const handleDeleteZone = async (id: string) => {
+  const handleDeleteZone = async () => {
+    if (!selectedZone) return;
     try {
-      await deleteDoc(doc(db, "Zone", id));
-      fetchZones();
+      await deleteDoc(doc(db, "Zone", selectedZone.id));
       toast.success("Zone deleted successfully!");
+      fetchZones();
     } catch (error) {
       console.error("Error deleting zone:", error);
       toast.error("Failed to delete zone.");
     }
+    setDeleteModalOpen(false);
   };
 
-  const handleSearch = (query: string) => {
-    setSearchQuery(query);
-    const lowerQuery = query.toLowerCase();
-    const filtered = zones.filter(
-      (zone) =>
-        zone.ZIPCode.toLowerCase().includes(lowerQuery) ||
-        zone.name.toLowerCase().includes(lowerQuery)
-    );
-    setFilteredZones(filtered);
-    setCurrentPage(1);
-  };
-
-  const handleFilterChange = (value: string) => {
-    setFilterOpen(value);
-    if (value) {
-      const filtered = zones.filter((zone) => zone.isOpen.toString() === value);
-      setFilteredZones(filtered);
-    } else {
-      setFilteredZones(zones);
+  const confirmToggleZoneStatus = async () => {
+    if (!selectedZone) return;
+    try {
+      const zoneRef = doc(db, "Zone", selectedZone.id);
+      await updateDoc(zoneRef, { isOpen: !selectedZone.isOpen });
+      toast.success(`Zone is now ${selectedZone.isOpen ? "Closed" : "Open"}!`);
+      fetchZones();
+    } catch (error) {
+      console.error("Error updating zone status:", error);
+      toast.error("Failed to update zone status.");
     }
-    setCurrentPage(1);
-  };
-
-  const handlePageChange = (event: React.ChangeEvent<unknown>, value: number) => {
-    setCurrentPage(value);
+    setConfirmModalOpen(false);
   };
 
   const openAddZoneModal = () => {
@@ -107,135 +115,142 @@ const ListZones: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setEditingZone(null);
-    fetchZones();
-  };
-
-  const confirmToggleZoneStatus = async () => {
-    if (!selectedZone) return;
-    try {
-      const zoneRef = doc(db, "Zone", selectedZone.id);
-      await updateDoc(zoneRef, { isOpen: !selectedZone.isOpen });
-      toast.success(`Zone is now ${selectedZone.isOpen ? "closed" : "open"}!`);
-      fetchZones();
-    } catch (error) {
-      console.error("Error updating zone status:", error);
-      toast.error("Failed to update zone status.");
-    }
-    setConfirmModalOpen(false);
-  };
-
   const openConfirmModal = (zone: Zone) => {
     setSelectedZone(zone);
     setConfirmModalOpen(true);
   };
 
-  // Pagination logic
-  const startIndex = (currentPage - 1) * zonesPerPage;
-  const currentZones = filteredZones.slice(startIndex, startIndex + zonesPerPage);
+  const openDeleteModal = (zone: Zone) => {
+    setSelectedZone(zone);
+    setDeleteModalOpen(true);
+  };
+
+  const indexOfLastZone = currentPage * zonesPerPage;
+  const indexOfFirstZone = indexOfLastZone - zonesPerPage;
+  const displayedZones = filteredZones.slice(indexOfFirstZone, indexOfLastZone);
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md dark:bg-[#0a100d]">
+    <div className="p-6 bg-white rounded-lg shadow-md text-center">
       <ToastContainer />
-
-      {/* Header */}
+  
+      {/* Header & Add Button */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-xl font-semibold text-gray-800 dark:text-[#d6d5c9]">Zone List</h1>
+        <h1 className="text-xl font-semibold">Zone List</h1>
         <button
           onClick={openAddZoneModal}
-          className="bg-[#a22c29] text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-[#902923] transition"
+          className="flex items-center gap-2 bg-red-500 text-white px-5 py-2 rounded-lg hover:bg-red-700 transition"
         >
-          <FaPlus />
-          <span>Add Zone</span>
+          <FaPlus /> Add Zone
         </button>
       </div>
-
+  
       {/* Search & Filter */}
-      <div className="flex justify-between mb-6 space-x-4">
+      <div className="flex flex-col md:flex-row md:justify-between mb-4 space-y-4 md:space-y-0">
         <input
           type="text"
+          placeholder="Search by ZIP Code or Name"
           value={searchQuery}
-          onChange={(e) => handleSearch(e.target.value)}
-          placeholder="Search by name or ZIP code"
-          className="w-full rounded-lg border-[1.5px] py-3 px-4"
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="w-full md:w-2/3 border p-3 rounded-lg text-lg"
         />
         <select
           value={filterOpen}
-          onChange={(e) => handleFilterChange(e.target.value)}
-          className="rounded-lg border-[1.5px] py-3 px-4"
+          onChange={(e) => setFilterOpen(e.target.value)}
+          className="border p-3 rounded-lg text-lg"
         >
           <option value="">All</option>
           <option value="true">Open</option>
           <option value="false">Closed</option>
         </select>
       </div>
-
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full table-auto border-collapse">
-          <thead>
-            <tr className="bg-gray-100 text-left">
-              <th className="px-4 py-2">Name</th>
-              <th className="px-4 py-2">GeoPoint</th>
-              <th className="px-4 py-2">Minimum Order Amount</th>
-              <th className="px-4 py-2">ZIP Code</th>
-              <th className="px-4 py-2">Area (km²)</th>
-              <th className="px-4 py-2">Is Open</th>
-              <th className="px-4 py-2">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {currentZones.map((zone) => (
-              <tr key={zone.id} className="border-t hover:bg-gray-100">
-                <td className="px-4 py-2">{zone.name}</td>
-                <td className="px-4 py-2">{zone.GeoPoint.latitude}, {zone.GeoPoint.longitude}</td>
-                <td className="px-4 py-2">${zone.MinimumOrderAmount.toFixed(2)}</td>
-                <td className="px-4 py-2">{zone.ZIPCode}</td>
-                <td className="px-4 py-2">{zone.Area} km²</td>
-                <td className="px-4 py-2">
-                  <button
-                    className={`px-4 py-1 rounded-full text-sm font-semibold
-                      ${zone.isOpen ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"} 
-                      hover:opacity-80 transition`}
-                    onClick={() => openConfirmModal(zone)}
-                  >
-                    {zone.isOpen ? "Open" : "Closed"}
-                  </button>
-                </td>
-                <td className="px-4 py-2 flex space-x-4">
-  {/* Edit Button */}
-  <button 
-    onClick={() => openEditZoneModal(zone)} 
-    className="text-gray-500 hover:text-blue-500 transition-colors duration-200"
-    title="Edit Zone"
-  >
-    <FaEdit />
-  </button>
-
-  {/* Delete Button */}
-  <button 
-    onClick={() => handleDeleteZone(zone.id)} 
-    className="text-gray-500 hover:text-red-500 transition-colors duration-200"
-    title="Delete Zone"
-  >
-    <FaTrashAlt />
-  </button>
-</td>
-
+  
+      {/* Zones Table */}
+      {loading ? (
+        <p>Loading zones...</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full border-collapse text-center">
+            <thead>
+              <tr className="bg-gray-100">
+                <th className="p-3">Name</th>
+                <th className="p-3">ZIP Code</th>
+                <th className="p-3">Area (km²)</th>
+                <th className="p-3">Is Open</th>
+                <th className="p-3">Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Pagination */}
+            </thead>
+            <tbody>
+              {displayedZones.map((zone) => (
+                <tr key={zone.id} className="border-t hover:bg-gray-100">
+                  <td className="p-3">{zone.name}</td>
+                  <td className="p-3">{zone.ZIPCode}</td>
+                  <td className="p-3">{zone.Area} km²</td>
+                  <td className="p-3">
+                    <button
+                      className={`px-4 py-1 rounded-full text-sm font-semibold ${
+                        zone.isOpen ? "bg-green-200 text-green-800" : "bg-yellow-200 text-yellow-800"
+                      }`}
+                      onClick={() => openConfirmModal(zone)}
+                    >
+                      {zone.isOpen ? "Open" : "Closed"}
+                    </button>
+                  </td>
+                  <td className="p-3">
+                    <button onClick={() => openEditZoneModal(zone)} className="text-blue-500 mx-2"><FaEdit /></button>
+                    <button onClick={() => openDeleteModal(zone)} className="text-red-500"><FaTrashAlt /></button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+  
+      {/* Centered Pagination */}
       <div className="flex justify-center mt-6">
-        <Pagination count={Math.ceil(filteredZones.length / zonesPerPage)} page={currentPage} onChange={handlePageChange} />
+        <Pagination count={Math.ceil(filteredZones.length / zonesPerPage)} page={currentPage} onChange={(e, value) => setCurrentPage(value)} />
       </div>
+  
+      {/* Add/Edit Modal */}
+      {isModalOpen && (
+        <AddZone
+          isEditing={isEditing}
+          editingZone={editingZone}
+          onClose={() => setIsModalOpen(false)}
+          onSuccess={fetchZones}
+        />
+      )}
+  
+      {/* Confirmation Modal for Open/Close Status */}
+      {confirmModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+            <h2 className="text-lg font-semibold mb-4">Confirm Status Change</h2>
+            <p className="mb-6">Are you sure you want to {selectedZone?.isOpen ? "close" : "open"} "{selectedZone?.name}"?</p>
+            <div className="flex justify-between">
+              <button onClick={confirmToggleZoneStatus} className="bg-green-500 text-white px-4 py-2 rounded w-1/2 mr-2">Confirm</button>
+              <button onClick={() => setConfirmModalOpen(false)} className="bg-gray-400 text-white px-4 py-2 rounded w-1/2">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+  
+      {/* Delete Confirmation Modal */}
+      {deleteModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white p-6 rounded-lg shadow-lg w-96">
+            <h2 className="text-lg font-semibold mb-4">Confirm Deletion</h2>
+            <p className="mb-6">Are you sure you want to delete "{selectedZone?.name}"?</p>
+            <div className="flex justify-between">
+              <button onClick={handleDeleteZone} className="bg-red-500 text-white px-4 py-2 rounded w-1/2 mr-2">Delete</button>
+              <button onClick={() => setDeleteModalOpen(false)} className="bg-gray-400 text-white px-4 py-2 rounded w-1/2">Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+  
 };
 
 export default ListZones;

@@ -8,7 +8,8 @@ import {
   FaTags,
   FaClipboardList,
   FaSignOutAlt,
-  FaMapMarkerAlt, // Import the map marker icon
+  FaMapMarkerAlt,
+  FaMapMarkedAlt, // Import the map marker icon
 } from "react-icons/fa";
 import Logo from "../../images/logo/Logodeele.svg";
 import SidebarLinkGroup from "./SidebarLinkGroup";
@@ -158,6 +159,22 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
               >
                 <FaTruck className="text-lg" />
                 Delivery Man
+              </NavLink>
+            </li>
+             {/* 📍 Tracking - NEW */}
+             <li>
+              <NavLink
+                to="/tracking"
+                className={({ isActive }) =>
+                  `flex items-center gap-4 px-4 py-3 text-sm font-medium rounded-lg ${
+                    isActive
+                      ? "bg-[#b9baa3] text-[#0a100d]"
+                      : "text-[#d6d5c9] hover:bg-[#d6d5c9] hover:text-[#0a100d]"
+                  }`
+                }
+              >
+                <FaMapMarkedAlt className="text-lg" />
+                Tracking
               </NavLink>
             </li>
 

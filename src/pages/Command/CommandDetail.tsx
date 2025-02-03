@@ -4,6 +4,7 @@ import { db } from "../../FirebaseConfig";
 import { doc, getDoc } from "firebase/firestore";
 import Breadcrumb from "../../components/Breadcrumbs/Breadcrumb";
 import { FaMapMarkerAlt, FaUser, FaTruck, FaShoppingCart, FaEuroSign, FaClock } from "react-icons/fa";
+import DeliveryTracking from "../Command/DeliveryTracking";
 
 interface CommandDetails {
   id: string;
@@ -23,13 +24,14 @@ interface CommandDetails {
   datePassCommande: string;
   dateShippingStart?: string;
   dateFinish?: string;
-  deliveryMan?: { name: string; photo: string };
+  deliveryMan?: { name: string; photo: string; location?: { latitude: number; longitude: number } };
   deliveryTime?: string | null;
 }
 
 const CommandDetail: React.FC = () => {
   const { id } = useParams();
   const [command, setCommand] = useState<CommandDetails | null>(null);
+  const [showMap, setShowMap] = useState(false);
 
   useEffect(() => {
     const fetchCommand = async () => {
@@ -44,15 +46,18 @@ const CommandDetail: React.FC = () => {
           const userSnap = data.user ? await getDoc(doc(db, data.user.path)) : null;
           const userName = userSnap?.exists() ? userSnap.data()?.firstName || "Unnamed User" : "Unknown User";
 
-          // Fetch Delivery Man Details
-          const deliveryManSnap = data.DelivaryMan ? await getDoc(doc(db, data.DelivaryMan.path)) : null;
-          const deliveryMan = deliveryManSnap?.exists()
-            ? {
+          // Fetch Delivery Man Details (Including Live Location)
+          let deliveryMan = undefined;
+          if (data.DelivaryMan) {
+            const deliveryManSnap = await getDoc(doc(db, data.DelivaryMan.path));
+            if (deliveryManSnap.exists()) {
+              deliveryMan = {
                 name: deliveryManSnap.data()?.firstName || "Unknown Delivery Man",
                 photo: deliveryManSnap.data()?.photo_url || "/placeholder-avatar.png",
-              }
-            : undefined;
-            console.log("Delivery Man Data:", deliveryMan); // Debug delivery man data
+                location: deliveryManSnap.data()?.location || undefined,
+              };
+            }
+          }
 
           // Fetch Product Details
           const products = await Promise.all(
@@ -116,146 +121,150 @@ const CommandDetail: React.FC = () => {
   if (!command) {
     return <div>Loading...</div>;
   }
+
   return (
     <div className="p-6 bg-white rounded-lg shadow-lg dark:bg-gray-800">
-    <Breadcrumb pageName={`Command Details`} />
+      <Breadcrumb pageName={`Command Details`} />
   
-   
-  
-    {/* General Information, Timeline, and Delivery Information */}
-    <div className="flex flex-wrap lg:flex-nowrap gap-6">
-      {/* General Information */}
-      <div className="flex-1 bg-gray-100 dark:bg-gray-700 p-6 rounded-md shadow">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-          General Information
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-          <FaUser className="inline-block mr-2" /> User: {command.userName}
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-          <FaMapMarkerAlt className="inline-block mr-2" /> Address:{" "}
-          {command.address.address} ({command.address.title})
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-          Latitude: {command.address.location.latitude}, Longitude:{" "}
-          {command.address.location.longitude}
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-          <FaEuroSign className="inline-block mr-2" /> Total Amount: €
-          {command.totalAmount.toFixed(2)}
-        </p>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-          Status:{" "}
-          <span
-            className={`${
-              command.status === "Finished"
-                ? "text-green-600"
-                : command.status === "Delivering"
-                ? "text-blue-500"
-                : "text-yellow-500"
-            }`}
-          >
-            {command.status}
-          </span>
-        </p>
-      </div>
-  
-      {/* Timeline */}
-      <div className="flex-1 bg-gray-100 dark:bg-gray-700 p-6 rounded-md shadow">
-        <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-          Timeline
-        </h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-          <FaShoppingCart className="inline-block mr-2" /> Command Placed:{" "}
-          {command.datePassCommande}
-        </p>
-        {command.dateShippingStart && (
+      {/* General Info, Timeline & Delivery Man Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        {/* General Information */}
+        <div className="bg-gray-100 dark:bg-gray-700 p-6 rounded-md shadow">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">General Information</h2>
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-            Shipping Started: {command.dateShippingStart}
+            <FaUser className="inline-block mr-2" /> User: {command.userName}
           </p>
-        )}
-        {command.dateFinish && (
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-            Finished: {command.dateFinish}
+            <FaMapMarkerAlt className="inline-block mr-2" /> Address: {command.address.address} ({command.address.title})
           </p>
-        )}
-        {command.deliveryTime && (
           <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
-            <FaClock className="inline-block mr-2" /> Delivery Time:{" "}
-            {command.deliveryTime}
+            Latitude: {command.address.location.latitude}, Longitude: {command.address.location.longitude}
           </p>
-        )}
-      </div>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            <FaEuroSign className="inline-block mr-2" /> Total Amount: €{command.totalAmount.toFixed(2)}
+          </p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Status:{" "}
+            <span className={`${
+              command.status === "Finished" ? "text-green-600" : 
+              command.status === "Delivering" ? "text-blue-500" : 
+              "text-yellow-500"
+            }`}>
+              {command.status}
+            </span>
+          </p>
+        </div>
   
-      {/* Delivery Information */}
-      {command.deliveryMan && (
-        <div className="flex-1 bg-gray-100 dark:bg-gray-700 p-6 rounded-md shadow">
-          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-            Delivery Information
-          </h2>
-          <div className="flex items-center mb-4">
+        {/* Timeline */}
+        <div className="bg-gray-100 dark:bg-gray-700 p-6 rounded-md shadow">
+          <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Timeline</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+            <FaShoppingCart className="inline-block mr-2" /> Order Placed: {command.datePassCommande}
+          </p>
+          {command.dateShippingStart && (
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+              Shipping Started: {command.dateShippingStart}
+            </p>
+          )}
+          {command.dateFinish && (
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+              Finished: {command.dateFinish}
+            </p>
+          )}
+          {command.deliveryTime && (
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
+              <FaClock className="inline-block mr-2" /> Delivery Time: {command.deliveryTime}
+            </p>
+          )}
+        </div>
+  
+        {/* Delivery Man Responsible */}
+        {command.deliveryMan && (
+          <div className="bg-gray-100 dark:bg-gray-700 p-6 rounded-md shadow flex flex-col items-center">
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Delivery Responsible</h2>
             <img
               src={command.deliveryMan.photo}
               alt={command.deliveryMan.name}
-              className="w-16 h-16 rounded-full mr-4 object-cover shadow"
+              className="w-20 h-20 rounded-full object-cover shadow mb-3"
             />
-            <div>
-              <p className="text-sm text-gray-600 dark:text-gray-300 font-semibold">
-                Name: {command.deliveryMan.name}
+            <p className="text-sm text-gray-600 dark:text-gray-300 font-semibold">{command.deliveryMan.name}</p>
+            {command.deliveryMan.location && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <FaTruck className="inline-block mr-1" /> Started from: 
+                <br />Lat: {command.deliveryMan.location.latitude}, Lng: {command.deliveryMan.location.longitude}
               </p>
-            </div>
+            )}
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-300">
-            <FaTruck className="inline-block mr-2" /> Responsible for delivery
-          </p>
+        )}
+      </div>
+  
+      {/* Track Delivery Button */}
+      {command.deliveryMan?.location && (
+        <div className="text-center mt-6">
+          <button 
+            onClick={() => setShowMap(true)}
+            className="px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition"
+          >
+            Track Delivery
+          </button>
         </div>
       )}
-    </div>
   
-    {/* Products */}
-    <div className="mt-6">
-      <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">
-        Products
-      </h2>
-      <div className="overflow-x-auto">
-        <table className="w-full table-auto text-left">
-          <thead className="bg-gray-100 dark:bg-gray-700">
-            <tr>
-              <th className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-white">
-                Product
-              </th>
-              <th className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-white">
-                Quantity
-              </th>
-              <th className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-white">
-                Price (€)
-              </th>
-              <th className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-white">
-                Subtotal (€)
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {command.products.map((product, index) => (
-              <tr
-                key={index}
-                className="border-b dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
-              >
-                <td className="px-4 py-2">{product.productName}</td>
-                <td className="px-4 py-2">{product.quantity}</td>
-                <td className="px-4 py-2">€{product.price.toFixed(2)}</td>
-                <td className="px-4 py-2">
-                  €{(product.price * product.quantity).toFixed(2)}
-                </td>
+      {/* Show Google Maps when clicked */}
+      {showMap && command.deliveryMan?.location && (
+  <div className="mt-6">
+    <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Delivery Route</h2>
+    <DeliveryTracking 
+      clientLocation={{
+        lat: command.address.location.latitude,
+        lng: command.address.location.longitude
+      }} 
+      deliveryStartLocation={{
+        lat: command.deliveryMan.location.latitude,
+        lng: command.deliveryMan.location.longitude
+      }} 
+    />
+  </div>
+)}
+
+  
+      {/* Products Section */}
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold text-gray-800 dark:text-white mb-4">Ordered Products</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full table-auto border-collapse border border-gray-300 dark:border-gray-600 text-left">
+            <thead className="bg-gray-100 dark:bg-gray-700">
+              <tr>
+                <th className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-white">Product</th>
+                <th className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-white">Quantity</th>
+                <th className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-white">Price (€)</th>
+                <th className="px-4 py-2 text-sm font-semibold text-gray-600 dark:text-white">Subtotal (€)</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {command.products.map((product, index) => (
+                <tr key={index} className="border-b dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700">
+                  <td className="px-4 py-2">{product.productName}</td>
+                  <td className="px-4 py-2">{product.quantity}</td>
+                  <td className="px-4 py-2">€{product.price.toFixed(2)}</td>
+                  <td className="px-4 py-2">€{(product.price * product.quantity).toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+  
+      {/* Total Amount */}
+      <div className="mt-4 text-right pr-4">
+        <h3 className="text-lg font-semibold text-gray-800 dark:text-white">
+          Total: €{command.totalAmount.toFixed(2)}
+        </h3>
       </div>
     </div>
-  </div>
-  
   );
+  
 };
 
 export default CommandDetail;

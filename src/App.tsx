@@ -27,6 +27,7 @@ import ListUsers from "./pages/Users/ListUsers";
 import AddZone from "./pages/Zone/AddZone";
 import ListZones from "./pages/Zone/ListZone";
 import Profile from "./pages/Authentication/Profile";
+import TrakingDelevery from "./pages/Traking/TrakingDelevery";
 
 function App() {
   const [loading, setLoading] = useState<boolean>(true);
@@ -142,6 +143,8 @@ function App() {
                     </>
                   }
                 />
+                <Route path="/tracking" element={<TrakingDelevery />} />
+
                 <Route
                   path="/ListCategories"
                   element={
