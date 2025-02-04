@@ -38,6 +38,8 @@ const AddProduct: React.FC = () => {
     images: [] as File[],
     category: null as Category | null,
     type: null as { value: string; label: string } | null,
+    hou: "", // ✅ NEW ATTRIBUTE
+
   });
 
   const [uploading, setUploading] = useState(false);
@@ -94,9 +96,10 @@ const AddProduct: React.FC = () => {
         : name === "price"
         ? parseFloat(value) || 0
         : value;
-
+  
     setFormData({ ...formData, [name]: parsedValue });
   };
+  
 
   const handleCategoryChange = (selectedCategory: any) => {
     const category = categories.find((cat) => cat.id === selectedCategory?.value) || null;
@@ -181,6 +184,8 @@ const AddProduct: React.FC = () => {
         type: typeRef, // Save type as a document reference
         creationDate: new Date(),
         status: "In Stock",
+        hou: formData.hou, // ✅ NEW ATTRIBUTE ADDED
+
       });
 
       toast.success("Product added successfully!");
@@ -198,6 +203,7 @@ const AddProduct: React.FC = () => {
         images: [],
         category: null,
         type: null,
+        hou: "", 
       });
       navigate("/ListProduct");
     } catch (error) {
@@ -457,6 +463,21 @@ const AddProduct: React.FC = () => {
             className="block w-full text-sm text-gray-500 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-[#a22c29] file:text-white file:cursor-pointer file:hover:bg-[#902923] focus:outline-none"
           />
         </div>
+        {/* New Field for hou */}
+<div>
+  <label className="block text-sm font-semibold text-[#0a100d] dark:text-[#d6d5c9] mb-2">
+    Hou
+  </label>
+  <input
+    type="text"
+    name="hou"
+    value={formData.hou}
+    onChange={handleInputChange}
+    className="w-full rounded-lg border border-[#b9baa3] bg-transparent py-3 px-5 text-[#0a100d] dark:text-[#d6d5c9] placeholder-gray-400 focus:border-[#a22c29] focus:outline-none"
+    placeholder="Enter Hou"
+  />
+</div>
+
   
         {/* Submit Button */}
         <div className="flex justify-center">
